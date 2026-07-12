@@ -1,7 +1,7 @@
 id,hostname,ip,platform,port,tags,description,updatedAt
 1,ssh-prod-web01.internal,10.0.2.14,Linux,22,"production,web,frontend",Frontend web proxy running Nginx and Node.js proxy,2026-06-20T10:30:00Z
 2,db-mysql-master.cluster,10.0.4.5,MySQL,3306,"production,database,replica-set",Primary transactional database for user accounts,2026-06-21T08:15:00Z
-3,ad-controller.corp.local,192.168.10.10,Windows,389,"corp,active-directory,auth",Active Directory Domain Controller for office employees,2026-06-19T14:20:00Z
+3,ad-controller.corp.local,192.168.10.10,Windows,389,"corp,active-directory,auth",Active Directory Domain Controller for office employees,2026-07-12T04:25:03.763Z
 4,router-core-border.net,172.16.1.1,Cisco,22,"network,infrastructure,edge",Core border gateway router facing ISP upstream,2026-06-22T11:05:00Z
 5,aws-rds-postgres.us-east-1.rds.amazonaws.com,54.210.12.89,PostgreSQL,5432,"aws,database,production",AWS RDS managed instance for analytics & business reports,2026-06-23T16:40:00Z
 6,vcenter-mgmt.local,10.50.0.100,VMware,443,"mgmt,virtualization,vsphere",vCenter Server Appliance managing host clusters,2026-06-18T09:00:00Z

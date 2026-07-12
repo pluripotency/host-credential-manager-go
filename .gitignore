@@ -1,0 +1,23 @@
+# Compiled binaries and executables
+host-credential-manager-go
+myapp.exe
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.tgz
+
+# Test binaries and coverage reports
+*.test
+*.out
+*.prof
+
+# Air hot-reload build directory
+tmp/
+
+# Local database store (automatically seeded/created at runtime)
+data/
+
+# OS-specific files
+.DS_Store

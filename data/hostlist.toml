@@ -26,7 +26,7 @@ platform = 'Windows'
 port = '389'
 tags = 'corp,active-directory,auth'
 description = 'Active Directory Domain Controller for office employees'
-updatedAt = '2026-06-19T14:20:00Z'
+updatedAt = '2026-07-12T04:25:03.763Z'
 
 [[host]]
 id = '4'

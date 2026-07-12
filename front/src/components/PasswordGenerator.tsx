@@ -16,62 +16,38 @@ export default function PasswordGenerator({ onUsePassword, className = "" }: Pas
   const [copied, setCopied] = useState(false);
   const [strength, setStrength] = useState({ score: 0, label: "None", color: "bg-gray-200 text-gray-700" });
 
-  const generatePassword = () => {
-    let charset = "";
-    if (includeLowercase) charset += "abcdefghijklmnopqrstuvwxyz";
-    if (includeUppercase) charset += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    if (includeNumbers) charset += "0123456789";
-    if (includeSymbols) charset += "!@#$%^&*()_+-=[]{}|;:,.<>?";
-
-    if (!charset) {
+  const generatePassword = async () => {
+    if (!includeLowercase && !includeUppercase && !includeNumbers && !includeSymbols) {
       setPassword("Select at least one character type");
-      return;
-    }
-
-    let result = "";
-    for (let i = 0; i < length; i++) {
-      const randomIndex = Math.floor(Math.random() * charset.length);
-      result += charset[randomIndex];
-    }
-    setPassword(result);
-    setCopied(false);
-  };
-
-  // Generate initial password on load
-  useEffect(() => {
-    generatePassword();
-  }, [length, includeUppercase, includeLowercase, includeNumbers, includeSymbols]);
-
-  // Calculate password strength
-  useEffect(() => {
-    if (!password || password.startsWith("Select")) {
       setStrength({ score: 0, label: "None", color: "bg-gray-200 text-gray-700" });
       return;
     }
 
-    let score = 0;
-    if (password.length >= 8) score += 1;
-    if (password.length >= 12) score += 1;
-    if (password.length >= 16) score += 1;
-    
-    let varieties = 0;
-    if (/[a-z]/.test(password)) varieties += 1;
-    if (/[A-Z]/.test(password)) varieties += 1;
-    if (/[0-9]/.test(password)) varieties += 1;
-    if (/[^a-zA-Z0-9]/.test(password)) varieties += 1;
-
-    score += Math.floor(varieties / 2);
-
-    if (score <= 2) {
-      setStrength({ score: 1, label: "Weak", color: "bg-red-500 text-white" });
-    } else if (score === 3) {
-      setStrength({ score: 2, label: "Medium", color: "bg-amber-500 text-white" });
-    } else if (score === 4) {
-      setStrength({ score: 3, label: "Strong", color: "bg-green-500 text-white" });
-    } else {
-      setStrength({ score: 4, label: "Excellent", color: "bg-teal-500 text-white" });
+    try {
+      const params = new URLSearchParams({
+        length: length.toString(),
+        lowercase: includeLowercase.toString(),
+        uppercase: includeUppercase.toString(),
+        numbers: includeNumbers.toString(),
+        symbols: includeSymbols.toString(),
+      });
+      const res = await fetch(`/api/password/generate?${params}`);
+      if (!res.ok) throw new Error("Failed to generate password");
+      const data = await res.json();
+      setPassword(data.password);
+      setStrength(data.strength);
+      setCopied(false);
+    } catch (err) {
+      console.error(err);
+      setPassword("Failed to generate password from server");
+      setStrength({ score: 0, label: "None", color: "bg-gray-200 text-gray-700" });
     }
-  }, [password]);
+  };
+
+  // Generate initial password on load and update on settings changes
+  useEffect(() => {
+    generatePassword();
+  }, [length, includeUppercase, includeLowercase, includeNumbers, includeSymbols]);
 
   const handleCopy = async () => {
     if (!password || password.startsWith("Select")) return;

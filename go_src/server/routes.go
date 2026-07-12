@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"host-credential-manager-go/go_src/credentials"
 	"host-credential-manager-go/go_src/db"
 	"host-credential-manager-go/go_src/models"
 )
@@ -50,6 +51,7 @@ func RegisterRoutes(e *echo.Echo) {
 	api.DELETE("/hostlist/:id", deleteHost)
 	api.POST("/hostlist/import", importHosts)
 	api.GET("/hostlist/export", exportHosts)
+	api.GET("/password/generate", generatePasswordHandler)
 	api.GET("/hello", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"message": "Hello from Go!"})
 	})
@@ -475,4 +477,38 @@ func IPRestrictionMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 
 		return next(c)
 	}
+}
+
+func generatePasswordHandler(c echo.Context) error {
+	lengthStr := c.QueryParam("length")
+	lowercaseStr := c.QueryParam("lowercase")
+	uppercaseStr := c.QueryParam("uppercase")
+	numbersStr := c.QueryParam("numbers")
+	symbolsStr := c.QueryParam("symbols")
+
+	length := 16
+	if lengthStr != "" {
+		if val, err := strconv.Atoi(lengthStr); err == nil {
+			length = val
+		}
+	}
+
+	parseBool := func(param string, defaultValue bool) bool {
+		if param == "" {
+			return defaultValue
+		}
+		return param == "true"
+	}
+
+	lowercase := parseBool(lowercaseStr, true)
+	uppercase := parseBool(uppercaseStr, true)
+	numbers := parseBool(numbersStr, true)
+	symbols := parseBool(symbolsStr, true)
+
+	password, strength := credentials.GeneratePassword(length, lowercase, uppercase, numbers, symbols)
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"password": password,
+		"strength": strength,
+	})
 }
