@@ -1,0 +1,249 @@
+[[host]]
+id = '1'
+hostname = 'ssh-prod-web01.internal'
+ip = '10.0.2.14'
+platform = 'Linux'
+port = '22'
+tags = 'production,web,frontend'
+description = 'Frontend web proxy running Nginx and Node.js proxy'
+updatedAt = '2026-06-20T10:30:00Z'
+
+[[host]]
+id = '2'
+hostname = 'db-mysql-master.cluster'
+ip = '10.0.4.5'
+platform = 'MySQL'
+port = '3306'
+tags = 'production,database,replica-set'
+description = 'Primary transactional database for user accounts'
+updatedAt = '2026-06-21T08:15:00Z'
+
+[[host]]
+id = '3'
+hostname = 'ad-controller.corp.local'
+ip = '192.168.10.10'
+platform = 'Windows'
+port = '389'
+tags = 'corp,active-directory,auth'
+description = 'Active Directory Domain Controller for office employees'
+updatedAt = '2026-06-19T14:20:00Z'
+
+[[host]]
+id = '4'
+hostname = 'router-core-border.net'
+ip = '172.16.1.1'
+platform = 'Cisco'
+port = '22'
+tags = 'network,infrastructure,edge'
+description = 'Core border gateway router facing ISP upstream'
+updatedAt = '2026-06-22T11:05:00Z'
+
+[[host]]
+id = '5'
+hostname = 'aws-rds-postgres.us-east-1.rds.amazonaws.com'
+ip = '54.210.12.89'
+platform = 'PostgreSQL'
+port = '5432'
+tags = 'aws,database,production'
+description = 'AWS RDS managed instance for analytics & business reports'
+updatedAt = '2026-06-23T16:40:00Z'
+
+[[host]]
+id = '6'
+hostname = 'vcenter-mgmt.local'
+ip = '10.50.0.100'
+platform = 'VMware'
+port = '443'
+tags = 'mgmt,virtualization,vsphere'
+description = 'vCenter Server Appliance managing host clusters'
+updatedAt = '2026-06-18T09:00:00Z'
+
+[[host]]
+id = '7'
+hostname = 'esxi-node-03.local'
+ip = '10.50.0.103'
+platform = 'VMware'
+port = '22'
+tags = 'infrastructure,virtualization,hypervisor'
+description = 'Baremetal ESXi hypervisor node hosting staging VMs'
+updatedAt = '2026-06-18T09:12:00Z'
+
+[[host]]
+id = '8'
+hostname = 'redis-cache-01.internal'
+ip = '10.0.8.20'
+platform = 'Redis'
+port = '6379'
+tags = 'cache,internal,performance'
+description = 'In-memory database for application session caching'
+updatedAt = '2026-06-25T12:00:00Z'
+
+[[host]]
+id = '9'
+hostname = 'windows-jumpbox.corp.local'
+ip = '192.168.10.25'
+platform = 'Windows'
+port = '3389'
+tags = 'corp,access,security'
+description = 'RDP Jump Host for developer staging environment access'
+updatedAt = '2026-06-15T15:30:00Z'
+
+[[host]]
+id = '10'
+hostname = 'git-gitlab.internal.net'
+ip = '10.0.10.150'
+platform = 'Linux'
+port = '443'
+tags = 'devops,vcs,self-hosted'
+description = 'GitLab Enterprise self-hosted code repository manager'
+updatedAt = '2026-06-24T17:15:00Z'
+
+[[host]]
+id = '11'
+hostname = 'jenkins-ci-controller'
+ip = '10.0.10.160'
+platform = 'Linux'
+port = '8080'
+tags = 'devops,ci-cd,automation'
+description = 'Jenkins automation controller executing builds and deployments'
+updatedAt = '2026-06-24T17:45:00Z'
+
+[[host]]
+id = '12'
+hostname = 'switch-floor2-core'
+ip = '192.168.20.2'
+platform = 'Cisco'
+port = '22'
+tags = 'network,infrastructure,switch'
+description = 'Floor 2 server rack aggregation core gigabit switch'
+updatedAt = '2026-06-10T11:22:00Z'
+
+[[host]]
+id = '13'
+hostname = 'mongodb-replica-01'
+ip = '10.0.6.11'
+platform = 'MongoDB'
+port = '27017'
+tags = 'database,nosql,staging'
+description = 'MongoDB Replica Set Primary database for catalog services'
+updatedAt = '2026-06-20T14:50:00Z'
+
+[[host]]
+id = '14'
+hostname = 'pve-cluster-node1'
+ip = '10.20.0.11'
+platform = 'Proxmox'
+port = '8006'
+tags = 'virtualization,homelab,private-cloud'
+description = 'Proxmox Virtual Environment node running container clusters'
+updatedAt = '2026-06-22T08:44:00Z'
+
+[[host]]
+id = '15'
+hostname = 'k8s-master-01.infra'
+ip = '10.120.0.10'
+platform = 'Kubernetes'
+port = '6443'
+tags = 'production,orchestration,containers'
+description = 'Kubernetes control plane API master node 1'
+updatedAt = '2026-06-25T11:10:00Z'
+
+[[host]]
+id = '16'
+hostname = 'k8s-worker-01.infra'
+ip = '10.120.0.21'
+platform = 'Kubernetes'
+port = '22'
+tags = 'production,orchestration,containers'
+description = 'Kubernetes worker node 1 executing client applications'
+updatedAt = '2026-06-25T11:15:00Z'
+
+[[host]]
+id = '17'
+hostname = 'nas-backup-vault'
+ip = '192.168.1.200'
+platform = 'FreeNAS'
+port = '443'
+tags = 'storage,backup,redundant'
+description = 'TrueNAS secure storage server with automated backup pools'
+updatedAt = '2026-06-12T03:00:00Z'
+
+[[host]]
+id = '18'
+hostname = 'opnsense-firewall.local'
+ip = '192.168.1.1'
+platform = 'OPNsense'
+port = '443'
+tags = 'network,security,gateway'
+description = 'OPNsense Core edge firewall routing & VPN endpoint'
+updatedAt = '2026-06-24T10:00:00Z'
+
+[[host]]
+id = '19'
+hostname = 'api-gateway.prod.cloud'
+ip = '3.120.45.188'
+platform = 'AWS'
+port = '443'
+tags = 'production,gateway,load-balancer'
+description = 'Kong API Gateway proxying internet requests to backend microservices'
+updatedAt = '2026-06-25T15:20:00Z'
+
+[[host]]
+id = '20'
+hostname = 'mac-builder-01.internal'
+ip = '10.0.10.201'
+platform = 'macOS'
+port = '22'
+tags = 'devops,ios,runner'
+description = 'Apple Mac Mini hosting CI build agent for iOS client compiling'
+updatedAt = '2026-06-14T12:00:00Z'
+
+[[host]]
+id = '21'
+hostname = 'dns-pihole.local'
+ip = '192.168.1.5'
+platform = 'Linux'
+port = '80'
+tags = 'network,dns,internal'
+description = 'Pi-hole local DNS server, ad blocker, and local domain routing'
+updatedAt = '2026-06-25T08:00:00Z'
+
+[[host]]
+id = '22'
+hostname = 'db-oracle-erp.corp'
+ip = '10.5.1.20'
+platform = 'Oracle'
+port = '1521'
+tags = 'database,enterprise,billing'
+description = 'Oracle Database instance holding corporate ERP financials'
+updatedAt = '2026-06-05T14:30:00Z'
+
+[[host]]
+id = '23'
+hostname = 'nginx-load-balancer-01'
+ip = '10.0.2.10'
+platform = 'Linux'
+port = '80'
+tags = 'production,load-balancer,network'
+description = 'Main incoming layer 7 HTTP load balancer'
+updatedAt = '2026-06-25T14:00:00Z'
+
+[[host]]
+id = '24'
+hostname = 'grafana-monitoring'
+ip = '10.0.30.12'
+platform = 'Grafana'
+port = '3000'
+tags = 'monitoring,ops,metrics'
+description = 'Grafana analytics visualizer for system dashboard metric tracking'
+updatedAt = '2026-06-25T16:00:00Z'
+
+[[host]]
+id = '25'
+hostname = 'prometheus-scraper'
+ip = '10.0.30.10'
+platform = 'Linux'
+port = '9090'
+tags = 'monitoring,ops,telemetry'
+description = 'Prometheus server scraping cluster nodes and exporter endpoints'
+updatedAt = '2026-06-25T16:10:00Z'

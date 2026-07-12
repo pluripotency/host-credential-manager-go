@@ -1,10 +1,10 @@
-import {GoApp} from './GoApp.tsx'
+import ManagerApp from './manager.tsx'
 
 function App() {
 
   return (
     <>
-      <GoApp/>
+      <ManagerApp/>
     </>
   )
 }

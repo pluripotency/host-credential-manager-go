@@ -1,8 +1,11 @@
-module pluripotency/vite-react-go
+module host-credential-manager-go
 
 go 1.26.4
 
-require github.com/labstack/echo/v4 v4.15.4
+require (
+	github.com/labstack/echo/v4 v4.15.4
+	github.com/pelletier/go-toml/v2 v2.4.3
+)
 
 require (
 	github.com/labstack/gommon v0.5.0 // indirect
@@ -14,4 +17,5 @@ require (
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 )
