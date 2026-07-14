@@ -3,11 +3,12 @@ import {
   Server, Key, Search, Plus, Edit2, Trash2, Copy, Check, Eye, EyeOff, 
   Download, Upload, RefreshCw, X, 
   Lock, ArrowUpDown, 
-  AlertCircle, Info
+  AlertCircle, Info, LogOut
 } from "lucide-react";
 import './index.css'
 import type { HostList, TableDensity } from "./types";
 import CredentialForm from "./components/CredentialForm";
+import Login from "./components/Login";
 import { platformIcons, platformBadgeColors, CATEGORIES } from "./components/PlatformDefs";
 
 interface Toast {
@@ -61,9 +62,46 @@ export default function ManagerApp() {
     }
   };
 
+  // Authentication states
+  const [role, setRole] = useState<"admin" | "user" | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // Check active session
+  const checkRole = async () => {
+    try {
+      const res = await fetch("/api/role");
+      const data = await res.json();
+      setRole(data.role);
+    } catch (err) {
+      setRole(null);
+    } finally {
+      setCheckingAuth(false);
+    }
+  };
+
   useEffect(() => {
-    fetchHostList();
+    checkRole();
   }, []);
+
+  useEffect(() => {
+    if (role) {
+      fetchHostList();
+    }
+  }, [role]);
+
+  // Logout handler
+  const handleLogout = async () => {
+    try {
+      const res = await fetch("/api/logout", { method: "POST" });
+      if (res.ok) {
+        setRole(null);
+        setHostList([]);
+        addToast("Logged out successfully", "info");
+      }
+    } catch (err) {
+      addToast("Logout failed", "error");
+    }
+  };
 
   // Show Toast Toast Notification helper
   const addToast = (message: string, type: Toast["type"] = "success") => {
@@ -331,7 +369,18 @@ export default function ManagerApp() {
         ))}
       </div>
 
-      {/* Main Header */}
+      {checkingAuth ? (
+        <div className="flex-1 bg-slate-50 flex flex-col items-center justify-center gap-3 text-slate-500 font-semibold text-xs min-h-[50vh]">
+          <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+          <span>Checking active session...</span>
+        </div>
+      ) : role === null ? (
+        <div className="flex-1">
+          <Login onLoginSuccess={(r) => setRole(r)} addToast={addToast} />
+        </div>
+      ) : (
+        <>
+          {/* Main Header */}
       <header className="bg-slate-900 text-white shrink-0 shadow-md">
         <div className="px-4 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 max-w-full">
           {/* Logo & Info */}
@@ -366,34 +415,50 @@ export default function ManagerApp() {
             </button>
 
             {/* Import Button */}
-            <button
-              onClick={() => setIsImportOpen(true)}
-              className="p-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-600 hover:text-slate-800 transition-colors flex items-center gap-1.5 text-xs font-semibold"
-            >
-              <Upload className="w-3.5 h-3.5 text-slate-500" />
-              <span>Import</span>
-            </button>
+            {role === "admin" && (
+              <button
+                onClick={() => setIsImportOpen(true)}
+                className="p-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-600 hover:text-slate-800 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+              >
+                <Upload className="w-3.5 h-3.5 text-slate-500" />
+                <span>Import</span>
+              </button>
+            )}
 
             {/* Export Button */}
-            <a
-              href="/api/hostlist/export"
-              download
-              className="p-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-600 hover:text-slate-800 transition-colors flex items-center gap-1.5 text-xs font-semibold"
-            >
-              <Download className="w-3.5 h-3.5 text-slate-500" />
-              <span>Export CSV</span>
-            </a>
+            {role === "admin" && (
+              <a
+                href="/api/hostlist/export"
+                download
+                className="p-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-600 hover:text-slate-800 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-500" />
+                <span>Export CSV</span>
+              </a>
+            )}
 
             {/* Add Host Primary Button */}
+            {role === "admin" && (
+              <button
+                onClick={() => {
+                  setEditingHost(null);
+                  setFormMode("add");
+                }}
+                className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs font-semibold shadow-sm shadow-blue-500/10 hover:shadow"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Register Host</span>
+              </button>
+            )}
+
+            {/* Sign Out Button */}
             <button
-              onClick={() => {
-                setEditingHost(null);
-                setFormMode("add");
-              }}
-              className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs font-semibold shadow-sm shadow-blue-500/10 hover:shadow"
+              onClick={handleLogout}
+              className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs font-semibold shadow-sm"
+              title="Sign Out"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Register Host</span>
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
             </button>
           </div>
         </div>
@@ -630,13 +695,15 @@ export default function ManagerApp() {
                       <span>Tags & Notes</span>
                     </th>
 
-                    <th 
-                      className={`px-4 text-right font-bold ${
-                        density === "super-dense" ? "py-1.5 w-[70px]" : density === "dense" ? "py-2 w-[90px]" : "py-3 w-[110px]"
-                      }`}
-                    >
-                      <span>Actions</span>
-                    </th>
+                    {role === "admin" && (
+                      <th 
+                        className={`px-4 text-right font-bold ${
+                          density === "super-dense" ? "py-1.5 w-[70px]" : density === "dense" ? "py-2 w-[90px]" : "py-3 w-[110px]"
+                        }`}
+                      >
+                        <span>Actions</span>
+                      </th>
+                    )}
                   </tr>
                 </thead>
 
@@ -740,6 +807,30 @@ export default function ManagerApp() {
                               const isPassShown = !!revealedPasswords[key];
                               const isCopiedUser = !!copiedStates[`${key}-user`];
                               const isCopiedPass = !!copiedStates[`${key}-pass`];
+                              
+                              if (role === "user") {
+                                return (
+                                  <div 
+                                    key={idx} 
+                                    className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 text-xs text-slate-700 font-medium whitespace-nowrap shadow-sm hover:bg-slate-100 transition-all"
+                                  >
+                                    <span className="font-semibold">{user.username}</span>
+                                    <span className="text-slate-300">|</span>
+                                    <button
+                                      onClick={() => handleCopyToClipboard(user.password, `${key}-pass`, "Password")}
+                                      className="p-0.5 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600 transition-all"
+                                      title="Copy Password"
+                                    >
+                                      {isCopiedPass ? (
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="w-3 h-3" />
+                                      )}
+                                    </button>
+                                  </div>
+                                );
+                              }
+
                               return (
                                 <div 
                                   key={idx} 
@@ -850,27 +941,29 @@ export default function ManagerApp() {
                         </td>
 
                         {/* Action buttons */}
-                        <td className={`${rowPadding} text-right pr-4 shrink-0`}>
-                          <div className="flex items-center justify-end gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => {
-                                setEditingHost(h);
-                                setFormMode("edit");
-                              }}
-                              className="p-1 hover:bg-amber-50 text-slate-400 hover:text-amber-600 border border-transparent hover:border-amber-200 rounded-md transition-all"
-                              title="Edit Host Details"
-                            >
-                              <Edit2 className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={() => setDeletingId(h.id)}
-                              className="p-1 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-transparent hover:border-rose-200 rounded-md transition-all"
-                              title="Delete Host"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </td>
+                        {role === "admin" && (
+                          <td className={`${rowPadding} text-right pr-4 shrink-0`}>
+                            <div className="flex items-center justify-end gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => {
+                                  setEditingHost(h);
+                                  setFormMode("edit");
+                                }}
+                                className="p-1 hover:bg-amber-50 text-slate-400 hover:text-amber-600 border border-transparent hover:border-amber-200 rounded-md transition-all"
+                                title="Edit Host Details"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => setDeletingId(h.id)}
+                                className="p-1 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-transparent hover:border-rose-200 rounded-md transition-all"
+                                title="Delete Host"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -1015,6 +1108,8 @@ export default function ManagerApp() {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

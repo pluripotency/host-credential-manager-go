@@ -35,4 +35,6 @@ type HostList struct {
 type Config struct {
 	PermitIPList   []string `toml:"permit_ip_list" json:"permit_ip_list"`
 	MasterPassword string   `toml:"masterpassword" json:"masterpassword"`
+	AdminPassword  string   `toml:"admin_password" json:"admin_password"`
+	UserPassword   string   `toml:"user_password" json:"user_password"`
 }

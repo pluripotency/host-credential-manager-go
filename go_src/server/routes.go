@@ -1,7 +1,12 @@
 package server
 
 import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/csv"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -45,17 +50,25 @@ func RegisterRoutes(e *echo.Echo) {
 	e.Use(IPRestrictionMiddleware)
 
 	api := e.Group("/api")
-	api.GET("/hostlist", getHostList)
-	api.POST("/hostlist", createHost)
-	api.PUT("/hostlist/:id", updateHost)
-	api.DELETE("/hostlist/:id", deleteHost)
-	api.POST("/hostlist/import", importHosts)
-	api.GET("/hostlist/export", exportHosts)
-	api.GET("/password/generate", generatePasswordHandler)
+	api.POST("/login", loginHandler)
+	api.POST("/logout", logoutHandler)
+	api.GET("/role", roleHandler)
 	api.POST("/ssh-fzf", sshFzfHandler)
 	api.GET("/hello", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"message": "Hello from Go!"})
 	})
+
+	// Auth routes
+	adminOrUserGroup := api.Group("", RequireAuth("admin", "user"))
+	adminOrUserGroup.GET("/hostlist", getHostList)
+	adminOrUserGroup.GET("/password/generate", generatePasswordHandler)
+
+	adminOnlyGroup := api.Group("", RequireAuth("admin"))
+	adminOnlyGroup.POST("/hostlist", createHost)
+	adminOnlyGroup.PUT("/hostlist/:id", updateHost)
+	adminOnlyGroup.DELETE("/hostlist/:id", deleteHost)
+	adminOnlyGroup.POST("/hostlist/import", importHosts)
+	adminOnlyGroup.GET("/hostlist/export", exportHosts)
 }
 
 func getHostList(c echo.Context) error {
@@ -566,3 +579,139 @@ func sshFzfHandler(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, map[string]string{"value": password})
 }
+
+var sessionSecret = make([]byte, 32)
+
+func init() {
+	_, err := rand.Read(sessionSecret)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func generateToken(role string) string {
+	h := hmac.New(sha256.New, sessionSecret)
+	h.Write([]byte(role))
+	return fmt.Sprintf("%s.%x", role, h.Sum(nil))
+}
+
+func verifyToken(token string) (string, bool) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 2 {
+		return "", false
+	}
+	role := parts[0]
+	expectedToken := generateToken(role)
+	if subtle.ConstantTimeCompare([]byte(token), []byte(expectedToken)) == 1 {
+		return role, true
+	}
+	return "", false
+}
+
+func RequireAuth(requiredRoles ...string) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			cookie, err := c.Cookie("session_token")
+			if err != nil {
+				return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized")
+			}
+
+			role, valid := verifyToken(cookie.Value)
+			if !valid {
+				return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized")
+			}
+
+			if len(requiredRoles) > 0 {
+				allowed := false
+				for _, rr := range requiredRoles {
+					if rr == role {
+						allowed = true
+						break
+					}
+				}
+				if !allowed {
+					return echo.NewHTTPError(http.StatusForbidden, "Forbidden")
+				}
+			}
+
+			c.Set("role", role)
+			return next(c)
+		}
+	}
+}
+
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+func loginHandler(c echo.Context) error {
+	var req LoginRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
+	}
+
+	conf, err := db.ReadConfig()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	var valid bool
+	if req.Username == "admin" {
+		valid = req.Password == conf.AdminPassword
+	} else if req.Username == "user" {
+		valid = req.Password == conf.UserPassword
+	} else {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid username or password"})
+	}
+
+	if !valid {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid username or password"})
+	}
+
+	token := generateToken(req.Username)
+
+	cookie := &http.Cookie{
+		Name:     "session_token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  time.Now().Add(24 * time.Hour),
+	}
+	c.SetCookie(cookie)
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"success": true,
+		"role":    req.Username,
+	})
+}
+
+func logoutHandler(c echo.Context) error {
+	cookie := &http.Cookie{
+		Name:     "session_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0),
+	}
+	c.SetCookie(cookie)
+	return c.JSON(http.StatusOK, map[string]bool{"success": true})
+}
+
+func roleHandler(c echo.Context) error {
+	cookie, err := c.Cookie("session_token")
+	if err != nil {
+		return c.JSON(http.StatusOK, map[string]interface{}{"role": nil})
+	}
+
+	role, valid := verifyToken(cookie.Value)
+	if !valid {
+		return c.JSON(http.StatusOK, map[string]interface{}{"role": nil})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{"role": role})
+}
+
