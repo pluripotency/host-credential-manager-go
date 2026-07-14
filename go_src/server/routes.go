@@ -52,6 +52,7 @@ func RegisterRoutes(e *echo.Echo) {
 	api.POST("/hostlist/import", importHosts)
 	api.GET("/hostlist/export", exportHosts)
 	api.GET("/password/generate", generatePasswordHandler)
+	api.POST("/ssh-fzf", sshFzfHandler)
 	api.GET("/hello", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"message": "Hello from Go!"})
 	})
@@ -457,14 +458,25 @@ func IPRestrictionMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			clientIP = c.Request().RemoteAddr
 		}
 
-		isLoopback := clientIP == "127.0.0.1" || clientIP == "::1"
+		parsedClient := net.ParseIP(clientIP)
+		isLoopback := false
+		if parsedClient != nil {
+			isLoopback = parsedClient.IsLoopback()
+		}
 
 		allowed := false
 		for _, permitted := range conf.PermitIPList {
-			if permitted == clientIP {
+			parsedPermitted := net.ParseIP(permitted)
+			if parsedClient != nil && parsedPermitted != nil {
+				if parsedClient.Equal(parsedPermitted) {
+					allowed = true
+					break
+				}
+			} else if permitted == clientIP {
 				allowed = true
 				break
 			}
+
 			if permitted == "127.0.0.1" && isLoopback {
 				allowed = true
 				break
@@ -511,4 +523,46 @@ func generatePasswordHandler(c echo.Context) error {
 		"password": password,
 		"strength": strength,
 	})
+}
+
+type SSHFzfRequest struct {
+	MasterPassword string `json:"masterpassword"`
+	Hostname       string `json:"hostname"`
+	Username       string `json:"username"`
+}
+
+func sshFzfHandler(c echo.Context) error {
+	var req SSHFzfRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
+	}
+
+	conf, err := db.ReadConfig()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	if req.MasterPassword != conf.MasterPassword {
+		return c.JSON(http.StatusOK, map[string]string{"value": ""})
+	}
+
+	creds, err := db.ReadHostCredentials()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	password := ""
+	for _, cr := range creds {
+		if cr.Hostname == req.Hostname {
+			for _, u := range cr.Userlist {
+				if u.Username == req.Username {
+					password = u.Password
+					break
+				}
+			}
+			break
+		}
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"value": password})
 }

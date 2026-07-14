@@ -59,7 +59,8 @@ func InitDatabase() error {
 	// Seed config.toml if it does not exist
 	if _, err := os.Stat(configFilePath); os.IsNotExist(err) {
 		conf := models.Config{
-			PermitIPList: []string{"127.0.0.1"},
+			PermitIPList:   []string{"127.0.0.1"},
+			MasterPassword: "password",
 		}
 		data, err := toml.Marshal(conf)
 		if err != nil {
@@ -68,7 +69,7 @@ func InitDatabase() error {
 		if err := os.WriteFile(configFilePath, data, 0644); err != nil {
 			return fmt.Errorf("failed to write config.toml: %w", err)
 		}
-		fmt.Println("Config file config.toml initialized with default IP permit list!")
+		fmt.Println("Config file config.toml initialized with default IP permit list and masterpassword!")
 	}
 
 	return nil
@@ -82,6 +83,7 @@ func ReadConfig() (models.Config, error) {
 	var conf models.Config
 	if _, err := os.Stat(configFilePath); os.IsNotExist(err) {
 		conf.PermitIPList = []string{"127.0.0.1"}
+		conf.MasterPassword = "password"
 		return conf, nil
 	}
 
@@ -92,6 +94,10 @@ func ReadConfig() (models.Config, error) {
 
 	if err := toml.Unmarshal(data, &conf); err != nil {
 		return conf, err
+	}
+
+	if conf.MasterPassword == "" {
+		conf.MasterPassword = "password"
 	}
 
 	return conf, nil

@@ -19,5 +19,8 @@ tmp/
 # Local database store (automatically seeded/created at runtime)
 data/
 
+# cert pem
+cert/*.pem
+
 # OS-specific files
 .DS_Store

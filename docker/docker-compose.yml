@@ -6,8 +6,8 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     image: host-credential-manager-go:latest
-    ports:
-      - "8080:8080"
+    network_mode: "host"
     volumes:
       - ../data:/root/data
+      - ../cert:/root/cert
     restart: always

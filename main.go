@@ -67,5 +67,17 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+
+	certFile := "cert/cert.pem"
+	keyFile := "cert/key.pem"
+	if _, errCert := os.Stat(certFile); errCert == nil {
+		if _, errKey := os.Stat(keyFile); errKey == nil {
+			e.Logger.Info("Certificates found. Starting server in HTTPS mode...")
+			e.Logger.Fatal(e.StartTLS(":"+port, certFile, keyFile))
+			return
+		}
+	}
+
+	e.Logger.Info("No certificates found. Starting server in HTTP mode...")
 	e.Logger.Fatal(e.Start(":" + port))
 }
