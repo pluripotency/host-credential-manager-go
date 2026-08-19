@@ -4,7 +4,6 @@ import "host-credential-manager-go/go_src/models"
 
 var hostListSeed = []models.Host{
 	{
-		ID:          "1",
 		Hostname:    "ssh-prod-web01.internal",
 		IP:          "10.0.2.14",
 		Platform:    "Linux",
@@ -14,7 +13,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-20T10:30:00Z",
 	},
 	{
-		ID:          "2",
 		Hostname:    "db-mysql-master.cluster",
 		IP:          "10.0.4.5",
 		Platform:    "MySQL",
@@ -24,7 +22,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-21T08:15:00Z",
 	},
 	{
-		ID:          "3",
 		Hostname:    "ad-controller.corp.local",
 		IP:          "192.168.10.10",
 		Platform:    "Windows",
@@ -34,7 +31,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-19T14:20:00Z",
 	},
 	{
-		ID:          "4",
 		Hostname:    "router-core-border.net",
 		IP:          "172.16.1.1",
 		Platform:    "Cisco",
@@ -44,7 +40,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-22T11:05:00Z",
 	},
 	{
-		ID:          "5",
 		Hostname:    "aws-rds-postgres.us-east-1.rds.amazonaws.com",
 		IP:          "54.210.12.89",
 		Platform:    "PostgreSQL",
@@ -54,7 +49,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-23T16:40:00Z",
 	},
 	{
-		ID:          "6",
 		Hostname:    "vcenter-mgmt.local",
 		IP:          "10.50.0.100",
 		Platform:    "VMware",
@@ -64,7 +58,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-18T09:00:00Z",
 	},
 	{
-		ID:          "7",
 		Hostname:    "esxi-node-03.local",
 		IP:          "10.50.0.103",
 		Platform:    "VMware",
@@ -74,7 +67,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-18T09:12:00Z",
 	},
 	{
-		ID:          "8",
 		Hostname:    "redis-cache-01.internal",
 		IP:          "10.0.8.20",
 		Platform:    "Redis",
@@ -84,7 +76,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-25T12:00:00Z",
 	},
 	{
-		ID:          "9",
 		Hostname:    "windows-jumpbox.corp.local",
 		IP:          "192.168.10.25",
 		Platform:    "Windows",
@@ -94,7 +85,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-15T15:30:00Z",
 	},
 	{
-		ID:          "10",
 		Hostname:    "git-gitlab.internal.net",
 		IP:          "10.0.10.150",
 		Platform:    "Linux",
@@ -104,7 +94,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-24T17:15:00Z",
 	},
 	{
-		ID:          "11",
 		Hostname:    "jenkins-ci-controller",
 		IP:          "10.0.10.160",
 		Platform:    "Linux",
@@ -114,7 +103,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-24T17:45:00Z",
 	},
 	{
-		ID:          "12",
 		Hostname:    "switch-floor2-core",
 		IP:          "192.168.20.2",
 		Platform:    "Cisco",
@@ -124,7 +112,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-10T11:22:00Z",
 	},
 	{
-		ID:          "13",
 		Hostname:    "mongodb-replica-01",
 		IP:          "10.0.6.11",
 		Platform:    "MongoDB",
@@ -134,7 +121,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-20T14:50:00Z",
 	},
 	{
-		ID:          "14",
 		Hostname:    "pve-cluster-node1",
 		IP:          "10.20.0.11",
 		Platform:    "Proxmox",
@@ -144,7 +130,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-22T08:44:00Z",
 	},
 	{
-		ID:          "15",
 		Hostname:    "k8s-master-01.infra",
 		IP:          "10.120.0.10",
 		Platform:    "Kubernetes",
@@ -154,7 +139,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-25T11:10:00Z",
 	},
 	{
-		ID:          "16",
 		Hostname:    "k8s-worker-01.infra",
 		IP:          "10.120.0.21",
 		Platform:    "Kubernetes",
@@ -164,7 +148,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-25T11:15:00Z",
 	},
 	{
-		ID:          "17",
 		Hostname:    "nas-backup-vault",
 		IP:          "192.168.1.200",
 		Platform:    "FreeNAS",
@@ -174,7 +157,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-12T03:00:00Z",
 	},
 	{
-		ID:          "18",
 		Hostname:    "opnsense-firewall.local",
 		IP:          "192.168.1.1",
 		Platform:    "OPNsense",
@@ -184,7 +166,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-24T10:00:00Z",
 	},
 	{
-		ID:          "19",
 		Hostname:    "api-gateway.prod.cloud",
 		IP:          "3.120.45.188",
 		Platform:    "AWS",
@@ -194,7 +175,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-25T15:20:00Z",
 	},
 	{
-		ID:          "20",
 		Hostname:    "mac-builder-01.internal",
 		IP:          "10.0.10.201",
 		Platform:    "macOS",
@@ -204,7 +184,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-14T12:00:00Z",
 	},
 	{
-		ID:          "21",
 		Hostname:    "dns-pihole.local",
 		IP:          "192.168.1.5",
 		Platform:    "Linux",
@@ -214,7 +193,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-25T08:00:00Z",
 	},
 	{
-		ID:          "22",
 		Hostname:    "db-oracle-erp.corp",
 		IP:          "10.5.1.20",
 		Platform:    "Oracle",
@@ -224,7 +202,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-05T14:30:00Z",
 	},
 	{
-		ID:          "23",
 		Hostname:    "nginx-load-balancer-01",
 		IP:          "10.0.2.10",
 		Platform:    "Linux",
@@ -234,7 +211,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-25T14:00:00Z",
 	},
 	{
-		ID:          "24",
 		Hostname:    "grafana-monitoring",
 		IP:          "10.0.30.12",
 		Platform:    "Grafana",
@@ -244,7 +220,6 @@ var hostListSeed = []models.Host{
 		UpdatedAt:   "2026-06-25T16:00:00Z",
 	},
 	{
-		ID:          "25",
 		Hostname:    "prometheus-scraper",
 		IP:          "10.0.30.10",
 		Platform:    "Linux",

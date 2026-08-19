@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 
 	"host-credential-manager-go/go_src/models"
@@ -102,7 +103,7 @@ func ReadConfig() (models.Config, error) {
 	return conf, nil
 }
 
-// ReadHostList loads hosts from the TOML file
+// ReadHostList loads hosts from the TOML file and assigns database IDs
 func ReadHostList() ([]models.Host, error) {
 	dbMutex.RLock()
 	defer dbMutex.RUnlock()
@@ -123,6 +124,10 @@ func ReadHostList() ([]models.Host, error) {
 
 	if hostList.Host == nil {
 		return []models.Host{}, nil
+	}
+
+	for i := range hostList.Host {
+		hostList.Host[i].ID = strconv.Itoa(i + 1)
 	}
 
 	return hostList.Host, nil
@@ -225,19 +230,18 @@ func WriteHostCredentials(creds []models.HostCredentials) error {
 	return writeHostCredentialsTOML(credTomlFilePath, creds)
 }
 
-// WriteHostListToCsv writes hosts in CSV format to an io.Writer
+// WriteHostListToCsv writes hosts in CSV format to an io.Writer without ID
 func WriteHostListToCsv(w io.Writer, hosts []models.Host) error {
 	writer := csv.NewWriter(w)
 	defer writer.Flush()
 
-	header := []string{"id", "hostname", "ip", "platform", "port", "tags", "description", "updatedAt"}
+	header := []string{"hostname", "ip", "platform", "port", "tags", "description", "updatedAt"}
 	if err := writer.Write(header); err != nil {
 		return err
 	}
 
 	for _, host := range hosts {
 		record := []string{
-			host.ID,
 			host.Hostname,
 			host.IP,
 			host.Platform,

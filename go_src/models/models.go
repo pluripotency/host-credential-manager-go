@@ -16,7 +16,7 @@ type HostCredentialsList struct {
 }
 
 type Host struct {
-	ID          string           `json:"id" csv:"id" toml:"id"`
+	ID          string           `json:"id" csv:"-" toml:"-"`
 	Hostname    string           `json:"hostname" csv:"hostname" toml:"hostname"`
 	IP          string           `json:"ip" csv:"ip" toml:"ip"`
 	Platform    string           `json:"platform" csv:"platform" toml:"platform"`
