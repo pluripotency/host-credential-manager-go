@@ -1,6 +1,6 @@
 # Compiled binaries and executables
-host-credential-manager-go
-myapp.exe
+host-credential-manager
+host-credential-manager.exe
 *.exe
 *.exe~
 *.dll
