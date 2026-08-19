@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/csv"
 	"fmt"
 	"net"
 	"net/http"
@@ -342,20 +341,51 @@ func deleteHost(c echo.Context) error {
 }
 
 func importHosts(c echo.Context) error {
-	var req ImportHostsRequest
-	if err := c.Bind(&req); err != nil {
-		return c.String(http.StatusBadRequest, "Invalid request body")
-	}
+	var hostsToImport []models.Host
+	merge := false
 
-	if req.Data == nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid data format. Expected an array of records."})
+	contentType := c.Request().Header.Get("Content-Type")
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		fileHeader, err := c.FormFile("file")
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Failed to get file from form data"})
+		}
+		src, err := fileHeader.Open()
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Failed to open uploaded file"})
+		}
+		defer src.Close()
+
+		parsedHosts, err := db.ReadHostListFromCsv(src)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("Failed to parse CSV: %v", err)})
+		}
+		hostsToImport = parsedHosts
+		merge = c.FormValue("merge") == "true"
+	} else if strings.HasPrefix(contentType, "text/csv") {
+		parsedHosts, err := db.ReadHostListFromCsv(c.Request().Body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("Failed to parse CSV: %v", err)})
+		}
+		hostsToImport = parsedHosts
+		merge = c.QueryParam("merge") == "true"
+	} else {
+		var req ImportHostsRequest
+		if err := c.Bind(&req); err != nil {
+			return c.String(http.StatusBadRequest, "Invalid request body")
+		}
+		if req.Data == nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid data format. Expected an array of records or CSV upload."})
+		}
+		hostsToImport = req.Data
+		merge = req.Merge
 	}
 
 	nowStr := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	baseTime := time.Now().UnixNano() / int64(time.Millisecond)
 
 	var cleaned []models.Host
-	for idx, item := range req.Data {
+	for idx, item := range hostsToImport {
 		id := item.ID
 		if id == "" {
 			id = strconv.FormatInt(baseTime+int64(idx), 10)
@@ -388,7 +418,7 @@ func importHosts(c echo.Context) error {
 		})
 	}
 
-	if req.Merge {
+	if merge {
 		current, err := db.ReadHostList()
 		if err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())
@@ -433,30 +463,7 @@ func exportHosts(c echo.Context) error {
 	res.Header().Set("Content-Disposition", "attachment; filename=hostlist.csv")
 	res.WriteHeader(http.StatusOK)
 
-	writer := csv.NewWriter(res.Writer)
-	defer writer.Flush()
-
-	header := []string{"id", "hostname", "ip", "platform", "port", "tags", "description", "updatedAt"}
-	if err := writer.Write(header); err != nil {
-		return err
-	}
-
-	for _, host := range hosts {
-		record := []string{
-			host.ID,
-			host.Hostname,
-			host.IP,
-			host.Platform,
-			host.Port,
-			host.Tags,
-			host.Description,
-			host.UpdatedAt,
-		}
-		if err := writer.Write(record); err != nil {
-			return err
-		}
-	}
-	return nil
+	return db.WriteHostListToCsv(res.Writer, hosts)
 }
 
 func IPRestrictionMiddleware(next echo.HandlerFunc) echo.HandlerFunc {

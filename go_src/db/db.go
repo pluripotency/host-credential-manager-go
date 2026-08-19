@@ -15,7 +15,6 @@ import (
 
 var (
 	dataDir          = "./data"
-	csvFilePath      = filepath.Join(dataDir, "hostlist.csv")
 	tomlFilePath     = filepath.Join(dataDir, "hostlist.toml")
 	credTomlFilePath = filepath.Join(dataDir, "host_credentials.toml")
 	configFilePath   = filepath.Join(dataDir, "config.toml")
@@ -30,14 +29,6 @@ func InitDatabase() error {
 	// Ensure data directory exists
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		return fmt.Errorf("failed to create data dir: %w", err)
-	}
-
-	// Seed hostlist.csv if it does not exist
-	if _, err := os.Stat(csvFilePath); os.IsNotExist(err) {
-		if err := writeHostListCSV(csvFilePath, hostListSeed); err != nil {
-			return fmt.Errorf("failed to seed hostlist.csv: %w", err)
-		}
-		fmt.Printf("Host Database seeded successfully with %d hosts (CSV)!\n", len(hostListSeed))
 	}
 
 	// Seed hostlist.toml if it does not exist
@@ -111,21 +102,35 @@ func ReadConfig() (models.Config, error) {
 	return conf, nil
 }
 
-// ReadHostList loads hosts from the CSV file
+// ReadHostList loads hosts from the TOML file
 func ReadHostList() ([]models.Host, error) {
 	dbMutex.RLock()
 	defer dbMutex.RUnlock()
 
-	file, err := os.Open(csvFilePath)
+	if _, err := os.Stat(tomlFilePath); os.IsNotExist(err) {
+		return []models.Host{}, nil
+	}
+
+	data, err := os.ReadFile(tomlFilePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return []models.Host{}, nil
-		}
 		return nil, err
 	}
-	defer file.Close()
 
-	reader := csv.NewReader(file)
+	var hostList models.HostList
+	if err := toml.Unmarshal(data, &hostList); err != nil {
+		return nil, err
+	}
+
+	if hostList.Host == nil {
+		return []models.Host{}, nil
+	}
+
+	return hostList.Host, nil
+}
+
+// ReadHostListFromCsv loads hosts from a CSV reader
+func ReadHostListFromCsv(r io.Reader) ([]models.Host, error) {
+	reader := csv.NewReader(r)
 	// Read header
 	header, err := reader.Read()
 	if err != nil {
@@ -174,14 +179,10 @@ func ReadHostList() ([]models.Host, error) {
 	return hosts, nil
 }
 
-// WriteHostList saves hosts to both CSV and TOML files
+// WriteHostList saves hosts to the TOML file
 func WriteHostList(hosts []models.Host) error {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
-
-	if err := writeHostListCSV(csvFilePath, hosts); err != nil {
-		return err
-	}
 
 	if err := writeHostListTOML(tomlFilePath, hosts); err != nil {
 		return err
@@ -224,15 +225,9 @@ func WriteHostCredentials(creds []models.HostCredentials) error {
 	return writeHostCredentialsTOML(credTomlFilePath, creds)
 }
 
-// Helper to write CSV
-func writeHostListCSV(path string, hosts []models.Host) error {
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	writer := csv.NewWriter(file)
+// WriteHostListToCsv writes hosts in CSV format to an io.Writer
+func WriteHostListToCsv(w io.Writer, hosts []models.Host) error {
+	writer := csv.NewWriter(w)
 	defer writer.Flush()
 
 	header := []string{"id", "hostname", "ip", "platform", "port", "tags", "description", "updatedAt"}
@@ -261,6 +256,9 @@ func writeHostListCSV(path string, hosts []models.Host) error {
 
 // Helper to write host list TOML
 func writeHostListTOML(path string, hosts []models.Host) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
 	list := models.HostList{Host: hosts}
 	data, err := toml.Marshal(list)
 	if err != nil {
@@ -272,6 +270,9 @@ func writeHostListTOML(path string, hosts []models.Host) error {
 
 // Helper to write credentials TOML
 func writeHostCredentialsTOML(path string, creds []models.HostCredentials) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
 	list := models.HostCredentialsList{Host: creds}
 	data, err := toml.Marshal(list)
 	if err != nil {
