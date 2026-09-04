@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import type { HostList } from "../types";
-import { X, Server, Key, Layers, Plus, Trash2 } from "lucide-react";
+import type { HostList, AccessItem } from "../types";
+import { X, Server, Key, Layers, Plus, Trash2, Globe, ExternalLink } from "lucide-react";
 import { platformOptions, PLATFORM_PORTS } from "./PlatformDefs";
 
 interface UserCredential {
@@ -16,18 +16,34 @@ interface CredentialFormProps {
 
 const POPULAR_TAGS = ["production", "staging", "internal", "web", "database", "network", "devops", "infrastructure"];
 
+const PROTOCOL_OPTIONS = [
+  { label: "HTTP", value: "http", defaultPort: "80" },
+  { label: "HTTPS", value: "https", defaultPort: "443" },
+  { label: "SSH", value: "ssh", defaultPort: "22" },
+  { label: "RDP", value: "rdp", defaultPort: "3389" },
+  { label: "MySQL", value: "mysql", defaultPort: "3306" },
+  { label: "PostgreSQL", value: "postgres", defaultPort: "5432" },
+  { label: "Redis", value: "redis", defaultPort: "6379" },
+  { label: "MongoDB", value: "mongodb", defaultPort: "27017" },
+  { label: "LDAP", value: "ldap", defaultPort: "389" },
+  { label: "Oracle", value: "oracle", defaultPort: "1521" },
+];
+
 export default function CredentialForm({ credential, onSave, onCancel }: CredentialFormProps) {
   const isEdit = !!credential;
   
   const [hostname, setHostname] = useState("");
   const [ip, setIp] = useState("");
   const [platform, setPlatform] = useState("Linux");
-  const [port, setPort] = useState("22");
+  const [os, setOs] = useState("");
   const [tags, setTags] = useState("");
   const [description, setDescription] = useState("");
   
-  // State for multiple credentials
-  const [userlist, setUserlist] = useState<UserCredential[]>([{ username: "", password: "" }]);
+  // State for AccessList
+  const [accesslist, setAccesslist] = useState<AccessItem[]>([{ protocol: "ssh", port: "22", path: "" }]);
+
+  // State for user credentials (optional, can be empty)
+  const [userlist, setUserlist] = useState<UserCredential[]>([]);
 
   // Initialize form with existing credential data if editing
   useEffect(() => {
@@ -35,14 +51,22 @@ export default function CredentialForm({ credential, onSave, onCancel }: Credent
       setHostname(credential.hostname);
       setIp(credential.ip);
       setPlatform(credential.platform);
-      setPort(credential.port);
+      setOs(credential.os || "");
       setTags(credential.tags);
       setDescription(credential.description);
+      
+      if (credential.accesslist && credential.accesslist.length > 0) {
+        setAccesslist(credential.accesslist.map(a => ({ ...a })));
+      } else {
+        const defaultProto = PLATFORM_PORTS[credential.platform] === "443" ? "https" :
+                             PLATFORM_PORTS[credential.platform] === "80" ? "http" : "ssh";
+        setAccesslist([{ protocol: defaultProto, port: credential.port || "22", path: "" }]);
+      }
+
       if (credential.userlist && credential.userlist.length > 0) {
-        // Deep copy of userlist array to avoid state side effects
         setUserlist(credential.userlist.map(u => ({ ...u })));
       } else {
-        setUserlist([{ username: "", password: "" }]);
+        setUserlist([]);
       }
     } else {
       resetForm();
@@ -53,29 +77,41 @@ export default function CredentialForm({ credential, onSave, onCancel }: Credent
     setHostname("");
     setIp("");
     setPlatform("Linux");
-    setPort("22");
+    setOs("");
     setTags("");
     setDescription("");
-    setUserlist([{ username: "", password: "" }]);
+    setAccesslist([{ protocol: "ssh", port: "22", path: "" }]);
+    setUserlist([]);
   };
 
-  // Handle auto-port mapping when platform changes
   const handlePlatformChange = (newPlatform: string) => {
     setPlatform(newPlatform);
     if (!isEdit && PLATFORM_PORTS[newPlatform]) {
-      setPort(PLATFORM_PORTS[newPlatform]);
+      const defaultPort = PLATFORM_PORTS[newPlatform];
+      if (accesslist.length === 1 && (!accesslist[0].port || accesslist[0].port === "22")) {
+        setAccesslist([{ ...accesslist[0], port: defaultPort }]);
+      }
     }
   };
 
   const handleTagClick = (tag: string) => {
     const currentTags = tags ? tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
     if (currentTags.includes(tag)) {
-      // Remove tag
       setTags(currentTags.filter((t) => t !== tag).join(", "));
     } else {
-      // Add tag
       setTags([...currentTags, tag].join(", "));
     }
+  };
+
+  const computeFullUrl = (item: AccessItem, currentIp: string, currentHost: string) => {
+    const target = currentIp.trim() || currentHost.trim() || "localhost";
+    const proto = (item.protocol || "http").toLowerCase().trim();
+    const portStr = item.port.trim() ? `:${item.port.trim()}` : "";
+    let rawPath = (item.path || "").trim();
+    if (rawPath && !rawPath.startsWith("/")) {
+      rawPath = "/" + rawPath;
+    }
+    return `${proto}://${target}${portStr}${rawPath}`;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -85,10 +121,16 @@ export default function CredentialForm({ credential, onSave, onCancel }: Credent
       return;
     }
 
-    // Filter out empty username/password rows
-    const validUsers = userlist.filter(u => u.username.trim() && u.password.trim());
-    if (validUsers.length === 0) {
-      alert("Please add at least one Username/Password pair.");
+    const validUsers = userlist
+      .filter(u => u.username.trim() || u.password.trim())
+      .map(u => ({
+        username: u.username.trim(),
+        password: u.password
+      }));
+
+    const validAccess = accesslist.filter(a => a.protocol.trim() && a.port.trim());
+    if (validAccess.length === 0) {
+      alert("Please add at least one Access protocol/port entry.");
       return;
     }
 
@@ -97,13 +139,16 @@ export default function CredentialForm({ credential, onSave, onCancel }: Credent
       hostname: hostname.trim(),
       ip: ip.trim(),
       platform,
-      port: port.trim(),
+      os: os.trim(),
+      port: validAccess[0].port.trim(),
       tags: tags.trim(),
       description: description.trim(),
-      userlist: validUsers.map(u => ({
-        username: u.username.trim(),
-        password: u.password
+      accesslist: validAccess.map(a => ({
+        protocol: a.protocol.trim(),
+        port: a.port.trim(),
+        path: (a.path || "").trim(),
       })),
+      userlist: validUsers,
     });
   };
 
@@ -157,13 +202,13 @@ export default function CredentialForm({ credential, onSave, onCancel }: Credent
 
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">
-              Port Number
+              OS <span className="text-slate-400 font-normal">(Optional)</span>
             </label>
             <input
               type="text"
-              value={port}
-              onChange={(e) => setPort(e.target.value)}
-              placeholder="e.g. 22"
+              value={os}
+              onChange={(e) => setOs(e.target.value)}
+              placeholder="e.g. Ubuntu 24.04, Windows 11"
               className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-mono"
             />
           </div>
@@ -201,12 +246,150 @@ export default function CredentialForm({ credential, onSave, onCancel }: Credent
 
         <hr className="border-slate-100" />
 
-        {/* Credentials Editor */}
+        {/* AccessList Editor */}
         <div className="space-y-3">
           <div className="flex justify-between items-center">
-            <label className="block text-xs font-semibold text-slate-600">
-              User Credentials <span className="text-rose-500">*</span>
-            </label>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600">
+                Access List (Protocols & Ports) <span className="text-rose-500">*</span>
+              </label>
+              <p className="text-[10px] text-slate-400">e.g. http(3000), https(8080), ssh(10022)</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAccesslist([...accesslist, { protocol: "http", port: "8080", path: "" }])}
+              className="text-[10px] bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded flex items-center gap-1 font-semibold transition-colors"
+            >
+              <Plus className="w-3 h-3" />
+              Add Access
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {accesslist.map((item, idx) => {
+              const protoLower = (item.protocol || "").toLowerCase().trim();
+              const isWeb = protoLower === "http" || protoLower === "https";
+              const fullUrl = computeFullUrl(item, ip, hostname);
+
+              return (
+                <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 relative">
+                  {accesslist.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setAccesslist(accesslist.filter((_, i) => i !== idx))}
+                      className="absolute top-2 right-2 p-1 hover:bg-rose-100 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                      title="Remove Access Entry"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 mb-0.5 uppercase tracking-tight">
+                        Protocol
+                      </label>
+                      <input
+                        type="text"
+                        list={`proto-options-${idx}`}
+                        value={item.protocol}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const matched = PROTOCOL_OPTIONS.find((p) => p.value.toLowerCase() === val.toLowerCase());
+                          const updated = [...accesslist];
+                          updated[idx].protocol = val;
+                          if (matched && (!updated[idx].port || updated[idx].port === "22" || updated[idx].port === "80")) {
+                            updated[idx].port = matched.defaultPort;
+                          }
+                          setAccesslist(updated);
+                        }}
+                        placeholder="e.g. http, https, ssh"
+                        className="w-full text-xs p-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                      />
+                      <datalist id={`proto-options-${idx}`}>
+                        {PROTOCOL_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </datalist>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 mb-0.5 uppercase tracking-tight">
+                        Port
+                      </label>
+                      <input
+                        type="text"
+                        value={item.port}
+                        onChange={(e) => {
+                          const updated = [...accesslist];
+                          updated[idx].port = e.target.value;
+                          setAccesslist(updated);
+                        }}
+                        placeholder="e.g. 3000"
+                        className="w-full text-xs p-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {isWeb && (
+                    <div className="pt-1 space-y-1.5">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-0.5 uppercase tracking-tight">
+                          URL Path (Optional for HTTP/HTTPS)
+                        </label>
+                        <input
+                          type="text"
+                          value={item.path || ""}
+                          onChange={(e) => {
+                            const updated = [...accesslist];
+                            updated[idx].path = e.target.value;
+                            setAccesslist(updated);
+                          }}
+                          placeholder="e.g. /dashboard or /admin"
+                          className="w-full text-xs p-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                        />
+                      </div>
+
+                      {/* Full URL Live Display */}
+                      <div className="bg-blue-50/90 border border-blue-200 rounded-lg p-2 flex items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Globe className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span className="text-[10px] font-bold text-blue-900 shrink-0">Full URL:</span>
+                          <span className="font-mono text-xs text-blue-700 font-semibold truncate" title={fullUrl}>
+                            {fullUrl}
+                          </span>
+                        </div>
+                        <a
+                          href={fullUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors shrink-0"
+                          title="Open URL in new tab"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <hr className="border-slate-100" />
+
+        {/* Credentials Editor (Optional) */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600">
+                User Credentials <span className="text-slate-400 font-normal">(Optional)</span>
+              </label>
+              <p className="text-[10px] text-slate-400">Username / Password pairs</p>
+            </div>
             <button
               type="button"
               onClick={() => setUserlist([...userlist, { username: "", password: "" }])}
@@ -217,10 +400,14 @@ export default function CredentialForm({ credential, onSave, onCancel }: Credent
             </button>
           </div>
 
-          <div className="space-y-3">
-            {userlist.map((user, idx) => (
-              <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 relative">
-                {userlist.length > 1 && (
+          {userlist.length === 0 ? (
+            <div className="p-3 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center">
+              <p className="text-[11px] text-slate-400">No user credentials added for this host.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {userlist.map((user, idx) => (
+                <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 relative">
                   <button
                     type="button"
                     onClick={() => setUserlist(userlist.filter((_, i) => i !== idx))}
@@ -229,66 +416,63 @@ export default function CredentialForm({ credential, onSave, onCancel }: Credent
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
-                )}
-                
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 mb-0.5 uppercase tracking-tight">
-                    Username
-                  </label>
-                  <input
-                    type="text"
-                    value={user.username}
-                    onChange={(e) => {
-                      const updated = [...userlist];
-                      updated[idx].username = e.target.value;
-                      setUserlist(updated);
-                    }}
-                    placeholder="e.g. root or administrator"
-                    required
-                    className="w-full text-xs p-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-0.5">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-                      Password
+                  
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 mb-0.5 uppercase tracking-tight">
+                      Username
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // Generate random clean password
-                        const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
-                        let gen = "";
-                        for (let i = 0; i < 16; i++) {
-                          gen += chars.charAt(Math.floor(Math.random() * chars.length));
-                        }
+                    <input
+                      type="text"
+                      value={user.username}
+                      onChange={(e) => {
                         const updated = [...userlist];
-                        updated[idx].password = gen;
+                        updated[idx].username = e.target.value;
                         setUserlist(updated);
                       }}
-                      className="text-[9px] text-blue-600 hover:underline flex items-center gap-0.5"
-                    >
-                      <Key className="w-2.5 h-2.5" />
-                      Generate
-                    </button>
+                      placeholder="e.g. root or administrator"
+                      className="w-full text-xs p-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono"
+                    />
                   </div>
-                  <input
-                    type="text"
-                    value={user.password}
-                    onChange={(e) => {
-                      const updated = [...userlist];
-                      updated[idx].password = e.target.value;
-                      setUserlist(updated);
-                    }}
-                    placeholder="Enter password"
-                    required
-                    className="w-full text-xs p-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono"
-                  />
+
+                  <div>
+                    <div className="flex justify-between items-center mb-0.5">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                        Password
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+                          let gen = "";
+                          for (let i = 0; i < 16; i++) {
+                            gen += chars.charAt(Math.floor(Math.random() * chars.length));
+                          }
+                          const updated = [...userlist];
+                          updated[idx].password = gen;
+                          setUserlist(updated);
+                        }}
+                        className="text-[9px] text-blue-600 hover:underline flex items-center gap-0.5"
+                      >
+                        <Key className="w-2.5 h-2.5" />
+                        Generate
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={user.password}
+                      onChange={(e) => {
+                        const updated = [...userlist];
+                        updated[idx].password = e.target.value;
+                        setUserlist(updated);
+                      }}
+                      placeholder="Enter password"
+                      className="w-full text-xs p-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono"
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <hr className="border-slate-100" />
@@ -306,7 +490,6 @@ export default function CredentialForm({ credential, onSave, onCancel }: Credent
             className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
           />
 
-          {/* Quick Tag Recommendations */}
           <div className="mt-2">
             <span className="text-[10px] text-slate-400 block mb-1">Popular Tags:</span>
             <div className="flex flex-wrap gap-1">

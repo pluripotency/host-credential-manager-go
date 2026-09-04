@@ -11,6 +11,11 @@ var hostListSeed = []models.Host{
 		Tags:        "production,web,frontend",
 		Description: "Frontend web proxy running Nginx and Node.js proxy",
 		UpdatedAt:   "2026-06-20T10:30:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "http", Port: "3000", Path: "/app"},
+			{Protocol: "https", Port: "8080", Path: "/admin"},
+			{Protocol: "ssh", Port: "10022"},
+		},
 	},
 	{
 		Hostname:    "db-mysql-master.cluster",
@@ -20,6 +25,9 @@ var hostListSeed = []models.Host{
 		Tags:        "production,database,replica-set",
 		Description: "Primary transactional database for user accounts",
 		UpdatedAt:   "2026-06-21T08:15:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "mysql", Port: "3306"},
+		},
 	},
 	{
 		Hostname:    "ad-controller.corp.local",
@@ -29,6 +37,10 @@ var hostListSeed = []models.Host{
 		Tags:        "corp,active-directory,auth",
 		Description: "Active Directory Domain Controller for office employees",
 		UpdatedAt:   "2026-06-19T14:20:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "ldap", Port: "389"},
+			{Protocol: "rdp", Port: "3389"},
+		},
 	},
 	{
 		Hostname:    "router-core-border.net",
@@ -38,6 +50,10 @@ var hostListSeed = []models.Host{
 		Tags:        "network,infrastructure,edge",
 		Description: "Core border gateway router facing ISP upstream",
 		UpdatedAt:   "2026-06-22T11:05:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "ssh", Port: "22"},
+			{Protocol: "https", Port: "443"},
+		},
 	},
 	{
 		Hostname:    "aws-rds-postgres.us-east-1.rds.amazonaws.com",
@@ -47,6 +63,9 @@ var hostListSeed = []models.Host{
 		Tags:        "aws,database,production",
 		Description: "AWS RDS managed instance for analytics & business reports",
 		UpdatedAt:   "2026-06-23T16:40:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "postgres", Port: "5432"},
+		},
 	},
 	{
 		Hostname:    "vcenter-mgmt.local",
@@ -56,6 +75,9 @@ var hostListSeed = []models.Host{
 		Tags:        "mgmt,virtualization,vsphere",
 		Description: "vCenter Server Appliance managing host clusters",
 		UpdatedAt:   "2026-06-18T09:00:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "https", Port: "443", Path: "/ui"},
+		},
 	},
 	{
 		Hostname:    "esxi-node-03.local",
@@ -65,6 +87,10 @@ var hostListSeed = []models.Host{
 		Tags:        "infrastructure,virtualization,hypervisor",
 		Description: "Baremetal ESXi hypervisor node hosting staging VMs",
 		UpdatedAt:   "2026-06-18T09:12:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "ssh", Port: "22"},
+			{Protocol: "https", Port: "443", Path: "/host"},
+		},
 	},
 	{
 		Hostname:    "redis-cache-01.internal",
@@ -74,6 +100,9 @@ var hostListSeed = []models.Host{
 		Tags:        "cache,internal,performance",
 		Description: "In-memory database for application session caching",
 		UpdatedAt:   "2026-06-25T12:00:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "redis", Port: "6379"},
+		},
 	},
 	{
 		Hostname:    "windows-jumpbox.corp.local",
@@ -83,6 +112,9 @@ var hostListSeed = []models.Host{
 		Tags:        "corp,access,security",
 		Description: "RDP Jump Host for developer staging environment access",
 		UpdatedAt:   "2026-06-15T15:30:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "rdp", Port: "3389"},
+		},
 	},
 	{
 		Hostname:    "git-gitlab.internal.net",
@@ -92,6 +124,10 @@ var hostListSeed = []models.Host{
 		Tags:        "devops,vcs,self-hosted",
 		Description: "GitLab Enterprise self-hosted code repository manager",
 		UpdatedAt:   "2026-06-24T17:15:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "https", Port: "443", Path: "/explore"},
+			{Protocol: "ssh", Port: "22"},
+		},
 	},
 	{
 		Hostname:    "jenkins-ci-controller",
@@ -101,6 +137,10 @@ var hostListSeed = []models.Host{
 		Tags:        "devops,ci-cd,automation",
 		Description: "Jenkins automation controller executing builds and deployments",
 		UpdatedAt:   "2026-06-24T17:45:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "http", Port: "8080", Path: "/blue"},
+			{Protocol: "ssh", Port: "10022"},
+		},
 	},
 	{
 		Hostname:    "switch-floor2-core",
@@ -110,6 +150,9 @@ var hostListSeed = []models.Host{
 		Tags:        "network,infrastructure,switch",
 		Description: "Floor 2 server rack aggregation core gigabit switch",
 		UpdatedAt:   "2026-06-10T11:22:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "ssh", Port: "22"},
+		},
 	},
 	{
 		Hostname:    "mongodb-replica-01",
@@ -119,6 +162,9 @@ var hostListSeed = []models.Host{
 		Tags:        "database,nosql,staging",
 		Description: "MongoDB Replica Set Primary database for catalog services",
 		UpdatedAt:   "2026-06-20T14:50:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "mongodb", Port: "27017"},
+		},
 	},
 	{
 		Hostname:    "pve-cluster-node1",
@@ -128,6 +174,9 @@ var hostListSeed = []models.Host{
 		Tags:        "virtualization,homelab,private-cloud",
 		Description: "Proxmox Virtual Environment node running container clusters",
 		UpdatedAt:   "2026-06-22T08:44:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "https", Port: "8006", Path: "/#v1:0:=node%2Fpve-cluster-node1"},
+		},
 	},
 	{
 		Hostname:    "k8s-master-01.infra",
@@ -137,6 +186,10 @@ var hostListSeed = []models.Host{
 		Tags:        "production,orchestration,containers",
 		Description: "Kubernetes control plane API master node 1",
 		UpdatedAt:   "2026-06-25T11:10:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "https", Port: "6443", Path: "/api/v1"},
+			{Protocol: "ssh", Port: "22"},
+		},
 	},
 	{
 		Hostname:    "k8s-worker-01.infra",
@@ -146,6 +199,9 @@ var hostListSeed = []models.Host{
 		Tags:        "production,orchestration,containers",
 		Description: "Kubernetes worker node 1 executing client applications",
 		UpdatedAt:   "2026-06-25T11:15:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "ssh", Port: "22"},
+		},
 	},
 	{
 		Hostname:    "nas-backup-vault",
@@ -155,6 +211,9 @@ var hostListSeed = []models.Host{
 		Tags:        "storage,backup,redundant",
 		Description: "TrueNAS secure storage server with automated backup pools",
 		UpdatedAt:   "2026-06-12T03:00:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "https", Port: "443", Path: "/ui/system/info"},
+		},
 	},
 	{
 		Hostname:    "opnsense-firewall.local",
@@ -164,6 +223,9 @@ var hostListSeed = []models.Host{
 		Tags:        "network,security,gateway",
 		Description: "OPNsense Core edge firewall routing & VPN endpoint",
 		UpdatedAt:   "2026-06-24T10:00:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "https", Port: "443", Path: "/ui/dashboard"},
+		},
 	},
 	{
 		Hostname:    "api-gateway.prod.cloud",
@@ -173,6 +235,10 @@ var hostListSeed = []models.Host{
 		Tags:        "production,gateway,load-balancer",
 		Description: "Kong API Gateway proxying internet requests to backend microservices",
 		UpdatedAt:   "2026-06-25T15:20:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "https", Port: "443", Path: "/status"},
+			{Protocol: "http", Port: "80"},
+		},
 	},
 	{
 		Hostname:    "mac-builder-01.internal",
@@ -182,6 +248,9 @@ var hostListSeed = []models.Host{
 		Tags:        "devops,ios,runner",
 		Description: "Apple Mac Mini hosting CI build agent for iOS client compiling",
 		UpdatedAt:   "2026-06-14T12:00:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "ssh", Port: "22"},
+		},
 	},
 	{
 		Hostname:    "dns-pihole.local",
@@ -191,6 +260,9 @@ var hostListSeed = []models.Host{
 		Tags:        "network,dns,internal",
 		Description: "Pi-hole local DNS server, ad blocker, and local domain routing",
 		UpdatedAt:   "2026-06-25T08:00:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "http", Port: "80", Path: "/admin"},
+		},
 	},
 	{
 		Hostname:    "db-oracle-erp.corp",
@@ -200,6 +272,9 @@ var hostListSeed = []models.Host{
 		Tags:        "database,enterprise,billing",
 		Description: "Oracle Database instance holding corporate ERP financials",
 		UpdatedAt:   "2026-06-05T14:30:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "oracle", Port: "1521"},
+		},
 	},
 	{
 		Hostname:    "nginx-load-balancer-01",
@@ -209,6 +284,10 @@ var hostListSeed = []models.Host{
 		Tags:        "production,load-balancer,network",
 		Description: "Main incoming layer 7 HTTP load balancer",
 		UpdatedAt:   "2026-06-25T14:00:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "http", Port: "80"},
+			{Protocol: "https", Port: "443"},
+		},
 	},
 	{
 		Hostname:    "grafana-monitoring",
@@ -218,6 +297,9 @@ var hostListSeed = []models.Host{
 		Tags:        "monitoring,ops,metrics",
 		Description: "Grafana analytics visualizer for system dashboard metric tracking",
 		UpdatedAt:   "2026-06-25T16:00:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "http", Port: "3000", Path: "/dashboards"},
+		},
 	},
 	{
 		Hostname:    "prometheus-scraper",
@@ -227,6 +309,9 @@ var hostListSeed = []models.Host{
 		Tags:        "monitoring,ops,telemetry",
 		Description: "Prometheus server scraping cluster nodes and exporter endpoints",
 		UpdatedAt:   "2026-06-25T16:10:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "http", Port: "9090", Path: "/graph"},
+		},
 	},
 }
 

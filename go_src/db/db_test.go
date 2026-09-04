@@ -192,3 +192,51 @@ updatedAt = '2026-01-01T00:00:00Z'
 		t.Errorf("expected ID '1' assigned by database, got: %+v", readLegacy[0])
 	}
 }
+
+func TestReadWriteAccessListToml(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalDataDir := dataDir
+	originalToml := tomlFilePath
+	defer func() {
+		dataDir = originalDataDir
+		tomlFilePath = originalToml
+	}()
+
+	dataDir = tmpDir
+	tomlFilePath = filepath.Join(tmpDir, "hostlist.toml")
+
+	testHosts := []models.Host{
+		{
+			Hostname: "web-server-test",
+			IP:       "192.168.1.100",
+			Platform: "Linux",
+			Port:     "80",
+			Accesslist: []models.AccessItem{
+				{Protocol: "http", Port: "8080", Path: "/app"},
+				{Protocol: "https", Port: "8443", Path: "/admin"},
+				{Protocol: "ssh", Port: "10022"},
+			},
+		},
+	}
+
+	if err := WriteHostList(testHosts); err != nil {
+		t.Fatalf("failed to write host list: %v", err)
+	}
+
+	readBack, err := ReadHostList()
+	if err != nil {
+		t.Fatalf("failed to read host list: %v", err)
+	}
+
+	if len(readBack) != 1 {
+		t.Fatalf("expected 1 host, got %d", len(readBack))
+	}
+
+	if len(readBack[0].Accesslist) != 3 {
+		t.Fatalf("expected 3 access items, got %d", len(readBack[0].Accesslist))
+	}
+
+	if readBack[0].Accesslist[0].Protocol != "http" || readBack[0].Accesslist[0].Port != "8080" || readBack[0].Accesslist[0].Path != "/app" {
+		t.Errorf("unexpected access item [0]: %+v", readBack[0].Accesslist[0])
+	}
+}

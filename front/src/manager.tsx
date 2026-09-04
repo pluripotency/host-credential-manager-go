@@ -3,7 +3,7 @@ import {
   Server, Key, Search, Plus, Edit2, Trash2, Copy, Check, Eye, EyeOff, 
   Download, Upload, RefreshCw, X, 
   Lock, ArrowUpDown, 
-  AlertCircle, Info, LogOut
+  AlertCircle, Info, LogOut, Globe, ExternalLink
 } from "lucide-react";
 import './index.css'
 import type { HostList, TableDensity } from "./types";
@@ -283,6 +283,7 @@ export default function ManagerApp() {
       const matchHostname = (h.hostname || "").toLowerCase().includes(q);
       const matchIP = (h.ip || "").toLowerCase().includes(q);
       const matchPlatform = (h.platform || "").toLowerCase().includes(q);
+      const matchOS = (h.os || "").toLowerCase().includes(q);
       const matchTags = (h.tags || "").toLowerCase().includes(q);
       const matchDesc = (h.description || "").toLowerCase().includes(q);
       
@@ -291,7 +292,17 @@ export default function ManagerApp() {
         ? h.userlist.some((u: any) => (u.username || "").toLowerCase().includes(q))
         : false;
       
-      return matchHostname || matchIP || matchPlatform || matchTags || matchDesc || matchUsername;
+      // Match if any access item matches protocol, port, or path
+      const matchAccess = h.accesslist
+        ? h.accesslist.some(
+            (a: any) =>
+              (a.protocol || "").toLowerCase().includes(q) ||
+              (a.port || "").toLowerCase().includes(q) ||
+              (a.path || "").toLowerCase().includes(q)
+          )
+        : false;
+
+      return matchHostname || matchIP || matchPlatform || matchOS || matchTags || matchDesc || matchUsername || matchAccess;
     }
 
     return true;
@@ -651,6 +662,18 @@ export default function ManagerApp() {
                         <ArrowUpDown className="w-3 h-3 text-slate-300" />
                       </div>
                     </th>
+
+                    <th 
+                      onClick={() => handleSort("os")}
+                      className={`cursor-pointer hover:bg-slate-100 select-none px-2 font-bold ${
+                        density === "super-dense" ? "py-1.5 w-[100px]" : density === "dense" ? "py-2 w-[120px]" : "py-3 w-[140px]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1 justify-between">
+                        <span>OS</span>
+                        <ArrowUpDown className="w-3 h-3 text-slate-300" />
+                      </div>
+                    </th>
                     
                     <th 
                       onClick={() => handleSort("hostname")}
@@ -667,18 +690,29 @@ export default function ManagerApp() {
                     <th 
                       onClick={() => handleSort("ip")}
                       className={`cursor-pointer hover:bg-slate-100 select-none px-2 font-bold ${
-                        density === "super-dense" ? "py-1.5 w-[150px]" : density === "dense" ? "py-2 w-[180px]" : "py-3 w-[210px]"
+                        density === "super-dense" ? "py-1.5 w-[120px]" : density === "dense" ? "py-2 w-[140px]" : "py-3 w-[160px]"
                       }`}
                     >
                       <div className="flex items-center gap-1 justify-between">
-                        <span>IP Address (Port)</span>
+                        <span>IP ADDRESS</span>
                         <ArrowUpDown className="w-3 h-3 text-slate-300" />
                       </div>
                     </th>
 
                     <th 
                       className={`px-2 font-bold ${
-                        density === "super-dense" ? "py-1.5 w-[240px]" : density === "dense" ? "py-2 w-[280px]" : "py-3 w-[320px]"
+                        density === "super-dense" ? "py-1.5 w-[180px]" : density === "dense" ? "py-2 w-[220px]" : "py-3 w-[260px]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>AccessList</span>
+                        <Globe className="w-3 h-3 text-slate-300" />
+                      </div>
+                    </th>
+
+                    <th 
+                      className={`px-2 font-bold ${
+                        density === "super-dense" ? "py-1.5 w-[220px]" : density === "dense" ? "py-2 w-[260px]" : "py-3 w-[300px]"
                       }`}
                     >
                       <div className="flex items-center gap-1">
@@ -742,6 +776,13 @@ export default function ManagerApp() {
                           </div>
                         </td>
 
+                        {/* OS Column */}
+                        <td className={`${rowPadding} font-mono text-slate-600 truncate`}>
+                          <span title={h.os || ""} className="truncate">
+                            {h.os ? h.os : <span className="text-slate-300 text-[10px]">---</span>}
+                          </span>
+                        </td>
+
                         {/* Hostname Column */}
                         <td className={`${rowPadding} font-mono font-medium text-slate-900 group/host relative`}>
                           <div className="flex items-center justify-between gap-1.5 pr-2">
@@ -766,27 +807,20 @@ export default function ManagerApp() {
                           </div>
                         </td>
 
-                        {/* IP Address and Port Column */}
-                        <td className={`${rowPadding} font-mono text-slate-500 group/ip whitespace-nowrap`}>
+                        {/* IP Address Column (Standalone, no port) */}
+                        <td className={`${rowPadding} font-mono text-slate-600 group/ip whitespace-nowrap`}>
                           <div className="flex items-center justify-between gap-1 pr-2">
-                            <div className="flex items-center min-w-0">
-                              <span 
-                                title={h.ip}
-                                className="cursor-pointer hover:text-blue-600"
-                                onClick={() => handleCopyToClipboard(h.ip, `${h.id}-ip`, "IP Address")}
-                              >
-                                {h.ip || "---"}
-                              </span>
-                              {h.port && (
-                                <span className="text-[10px] text-slate-400 font-normal ml-1">
-                                  :{h.port}
-                                </span>
-                              )}
-                            </div>
+                            <span 
+                              title={h.ip}
+                              className="cursor-pointer hover:text-blue-600 truncate"
+                              onClick={() => handleCopyToClipboard(h.ip, `${h.id}-ip`, "IP Address")}
+                            >
+                              {h.ip || "---"}
+                            </span>
                             {h.ip && (
                               <button
                                 onClick={() => handleCopyToClipboard(h.ip, `${h.id}-ip`, "IP Address")}
-                                className="opacity-0 group-hover/ip:opacity-100 p-0.5 hover:bg-slate-200 text-slate-400 hover:text-slate-700 rounded transition-opacity"
+                                className="opacity-0 group-hover/ip:opacity-100 p-0.5 hover:bg-slate-200 text-slate-400 hover:text-slate-700 rounded transition-opacity shrink-0"
                                 title="Copy IP"
                               >
                                 {isCopiedIP ? (
@@ -799,10 +833,62 @@ export default function ManagerApp() {
                           </div>
                         </td>
 
+                        {/* AccessList Column */}
+                        <td className={`${rowPadding}`}>
+                          <div className="flex flex-wrap gap-1 max-w-full">
+                            {(h.accesslist && h.accesslist.length > 0
+                              ? h.accesslist
+                              : [{ protocol: h.platform === "Windows" ? "rdp" : h.platform === "MySQL" ? "mysql" : "ssh", port: h.port || "22" }]
+                            ).map((accessItem: any, idx: number) => {
+                              const proto = (accessItem.protocol || "http").toLowerCase().trim();
+                              const isWeb = proto === "http" || proto === "https";
+                              
+                              const target = h.ip.trim() || h.hostname.trim() || "localhost";
+                              const portStr = accessItem.port ? `:${accessItem.port}` : "";
+                              let rawPath = (accessItem.path || "").trim();
+                              if (rawPath && !rawPath.startsWith("/")) {
+                                rawPath = "/" + rawPath;
+                              }
+                              const fullUrl = `${proto}://${target}${portStr}${rawPath}`;
+
+                              let badgeStyle = "bg-slate-100 text-slate-700 border-slate-200";
+                              if (proto === "http") badgeStyle = "bg-sky-50 text-sky-700 border-sky-200";
+                              else if (proto === "https") badgeStyle = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                              else if (proto === "ssh") badgeStyle = "bg-amber-50 text-amber-700 border-amber-200";
+                              else if (proto === "rdp") badgeStyle = "bg-indigo-50 text-indigo-700 border-indigo-200";
+                              else if (proto === "mysql" || proto === "postgres" || proto === "oracle") badgeStyle = "bg-blue-50 text-blue-700 border-blue-200";
+                              else if (proto === "redis" || proto === "mongodb") badgeStyle = "bg-rose-50 text-rose-700 border-rose-200";
+
+                              return (
+                                <div
+                                  key={idx}
+                                  className={`inline-flex items-center gap-1 border rounded-md px-1.5 py-0.5 text-[11px] font-mono font-medium shadow-2xs whitespace-nowrap ${badgeStyle}`}
+                                  title={isWeb ? `Full URL: ${fullUrl}` : `${accessItem.protocol}(${accessItem.port})`}
+                                >
+                                  <span>{accessItem.protocol}({accessItem.port})</span>
+                                  {isWeb && (
+                                    <a
+                                      href={fullUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="p-0.5 hover:bg-black/10 rounded transition-colors text-current shrink-0 inline-flex items-center"
+                                      title={`Open ${fullUrl} in new tab`}
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </td>
+
                         {/* USERLIST Column */}
                         <td className={`${rowPadding}`}>
                           <div className="flex flex-wrap gap-1.5 max-w-full">
-                            {h.userlist && h.userlist.map((user: any, idx: number) => {
+                            {h.userlist && h.userlist.length > 0 ? (
+                              h.userlist.map((user: any, idx: number) => {
                               const key = `${h.id}-${idx}`;
                               const isPassShown = !!revealedPasswords[key];
                               const isCopiedUser = !!copiedStates[`${key}-user`];
@@ -904,7 +990,10 @@ export default function ManagerApp() {
                                   </div>
                                 </div>
                               );
-                            })}
+                            })
+                            ) : (
+                              <span className="text-[10px] text-slate-300 font-mono">---</span>
+                            )}
                           </div>
                         </td>
 
@@ -1043,7 +1132,7 @@ export default function ManagerApp() {
               <p className="text-slate-500 leading-relaxed">
                 Choose a `.csv` file with headers matching the Host List schema (without credentials): 
                 <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-[10px] ml-1">
-                  hostname, ip, platform, port, tags, description
+                  hostname, ip, platform, os, port, tags, description
                 </code>
               </p>
 

@@ -2,17 +2,54 @@ package db
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 
 	"host-credential-manager-go/go_src/models"
 
 	"github.com/pelletier/go-toml/v2"
 )
+
+// DefaultProtocol returns a standard protocol for a given platform and port
+func DefaultProtocol(platform, port string) string {
+	p := strings.ToLower(platform)
+	switch p {
+	case "linux", "macos", "freebsd", "cisco", "router", "switch":
+		return "ssh"
+	case "windows":
+		return "rdp"
+	case "mysql":
+		return "mysql"
+	case "postgresql", "postgres":
+		return "postgres"
+	case "redis":
+		return "redis"
+	case "mongodb":
+		return "mongodb"
+	case "oracle":
+		return "oracle"
+	default:
+		if port == "443" || port == "8443" || port == "8006" || port == "6443" {
+			return "https"
+		}
+		if port == "80" || port == "8080" || port == "3000" {
+			return "http"
+		}
+		if port == "22" {
+			return "ssh"
+		}
+		if port == "3389" {
+			return "rdp"
+		}
+		return "http"
+	}
+}
 
 var (
 	dataDir          = "./data"
@@ -128,6 +165,12 @@ func ReadHostList() ([]models.Host, error) {
 
 	for i := range hostList.Host {
 		hostList.Host[i].ID = strconv.Itoa(i + 1)
+		if len(hostList.Host[i].Accesslist) == 0 && hostList.Host[i].Port != "" {
+			proto := DefaultProtocol(hostList.Host[i].Platform, hostList.Host[i].Port)
+			hostList.Host[i].Accesslist = []models.AccessItem{
+				{Protocol: proto, Port: hostList.Host[i].Port},
+			}
+		}
 	}
 
 	return hostList.Host, nil
@@ -168,15 +211,32 @@ func ReadHostListFromCsv(r io.Reader) ([]models.Host, error) {
 			return ""
 		}
 
+		var accesslist []models.AccessItem
+		accesslistVal := getVal("accesslist")
+		if accesslistVal != "" {
+			_ = json.Unmarshal([]byte(accesslistVal), &accesslist)
+		}
+
+		portVal := getVal("port")
+		platformVal := getVal("platform")
+		if len(accesslist) == 0 && portVal != "" {
+			proto := DefaultProtocol(platformVal, portVal)
+			accesslist = []models.AccessItem{
+				{Protocol: proto, Port: portVal},
+			}
+		}
+
 		host := models.Host{
 			ID:          getVal("id"),
 			Hostname:    getVal("hostname"),
 			IP:          getVal("ip"),
-			Platform:    getVal("platform"),
-			Port:        getVal("port"),
+			Platform:    platformVal,
+			OS:          getVal("os"),
+			Port:        portVal,
 			Tags:        getVal("tags"),
 			Description: getVal("description"),
 			UpdatedAt:   getVal("updatedAt"),
+			Accesslist:  accesslist,
 		}
 		hosts = append(hosts, host)
 	}
@@ -235,20 +295,23 @@ func WriteHostListToCsv(w io.Writer, hosts []models.Host) error {
 	writer := csv.NewWriter(w)
 	defer writer.Flush()
 
-	header := []string{"hostname", "ip", "platform", "port", "tags", "description", "updatedAt"}
+	header := []string{"hostname", "ip", "platform", "os", "port", "tags", "description", "updatedAt", "accesslist"}
 	if err := writer.Write(header); err != nil {
 		return err
 	}
 
 	for _, host := range hosts {
+		accessJson, _ := json.Marshal(host.Accesslist)
 		record := []string{
 			host.Hostname,
 			host.IP,
 			host.Platform,
+			host.OS,
 			host.Port,
 			host.Tags,
 			host.Description,
 			host.UpdatedAt,
+			string(accessJson),
 		}
 		if err := writer.Write(record); err != nil {
 			return err

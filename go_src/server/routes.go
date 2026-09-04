@@ -22,20 +22,24 @@ type CreateHostRequest struct {
 	Hostname    string                  `json:"hostname"`
 	IP          string                  `json:"ip"`
 	Platform    string                  `json:"platform"`
+	OS          string                  `json:"os"`
 	Port        string                  `json:"port"`
 	Tags        string                  `json:"tags"`
 	Description string                  `json:"description"`
 	Userlist    []models.UserCredential `json:"userlist"`
+	Accesslist  []models.AccessItem     `json:"accesslist"`
 }
 
 type UpdateHostRequest struct {
 	Hostname    *string                  `json:"hostname"`
 	IP          *string                  `json:"ip"`
 	Platform    *string                  `json:"platform"`
+	OS          *string                  `json:"os"`
 	Port        *string                  `json:"port"`
 	Tags        *string                  `json:"tags"`
 	Description *string                  `json:"description"`
 	Userlist    *[]models.UserCredential `json:"userlist"`
+	Accesslist  *[]models.AccessItem     `json:"accesslist"`
 }
 
 type ImportHostsRequest struct {
@@ -122,10 +126,12 @@ func createHost(c echo.Context) error {
 		Hostname:    req.Hostname,
 		IP:          strings.TrimSpace(req.IP),
 		Platform:    req.Platform,
+		OS:          strings.TrimSpace(req.OS),
 		Port:        strings.TrimSpace(req.Port),
 		Tags:        strings.TrimSpace(req.Tags),
 		Description: strings.TrimSpace(req.Description),
 		UpdatedAt:   time.Now().UTC().Format("2006-01-02T15:04:05.000Z"),
+		Accesslist:  req.Accesslist,
 	}
 
 	hosts = append([]models.Host{newHost}, hosts...)
@@ -211,6 +217,9 @@ func updateHost(c echo.Context) error {
 	if req.Platform != nil {
 		hosts[index].Platform = strings.TrimSpace(*req.Platform)
 	}
+	if req.OS != nil {
+		hosts[index].OS = strings.TrimSpace(*req.OS)
+	}
 	if req.Port != nil {
 		hosts[index].Port = strings.TrimSpace(*req.Port)
 	}
@@ -219,6 +228,9 @@ func updateHost(c echo.Context) error {
 	}
 	if req.Description != nil {
 		hosts[index].Description = strings.TrimSpace(*req.Description)
+	}
+	if req.Accesslist != nil {
+		hosts[index].Accesslist = *req.Accesslist
 	}
 	hosts[index].UpdatedAt = time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
@@ -411,10 +423,12 @@ func importHosts(c echo.Context) error {
 			Hostname:    hostname,
 			IP:          strings.TrimSpace(item.IP),
 			Platform:    platform,
+			OS:          strings.TrimSpace(item.OS),
 			Port:        strings.TrimSpace(item.Port),
 			Tags:        strings.TrimSpace(item.Tags),
 			Description: strings.TrimSpace(item.Description),
 			UpdatedAt:   updatedAt,
+			Accesslist:  item.Accesslist,
 		})
 	}
 
