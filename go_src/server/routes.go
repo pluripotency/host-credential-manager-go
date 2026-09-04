@@ -56,6 +56,9 @@ func RegisterRoutes(e *echo.Echo) {
 	api.POST("/login", loginHandler)
 	api.POST("/logout", logoutHandler)
 	api.GET("/role", roleHandler)
+	api.GET("/ssh-fzf", getSSHFzfTargetsHandler)
+	api.GET("/ssh-fzf/targets", getSSHFzfTargetsHandler)
+	api.POST("/ssh-fzf/targets", getSSHFzfTargetsHandler)
 	api.POST("/ssh-fzf", sshFzfHandler)
 	api.GET("/hello", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"message": "Hello from Go!"})
@@ -559,6 +562,65 @@ func generatePasswordHandler(c echo.Context) error {
 	})
 }
 
+type SSHFzfTarget struct {
+	Hostname string `json:"hostname"`
+	IP       string `json:"ip"`
+	Port     string `json:"port"`
+	Username string `json:"username"`
+}
+
+func getSSHFzfTargets() ([]SSHFzfTarget, error) {
+	hosts, err := db.ReadHostList()
+	if err != nil {
+		return nil, err
+	}
+
+	creds, err := db.ReadHostCredentials()
+	if err != nil {
+		return nil, err
+	}
+
+	credsMap := make(map[string][]models.UserCredential)
+	for _, cr := range creds {
+		credsMap[cr.Hostname] = cr.Userlist
+	}
+
+	var targets []SSHFzfTarget
+	for _, host := range hosts {
+		for _, access := range host.Accesslist {
+			if strings.ToLower(strings.TrimSpace(access.Protocol)) == "ssh" {
+				port := strings.TrimSpace(access.Port)
+				if port == "" {
+					port = "22"
+				}
+				users := credsMap[host.Hostname]
+				for _, u := range users {
+					targets = append(targets, SSHFzfTarget{
+						Hostname: host.Hostname,
+						IP:       host.IP,
+						Port:     port,
+						Username: u.Username,
+					})
+				}
+			}
+		}
+	}
+
+	if targets == nil {
+		targets = []SSHFzfTarget{}
+	}
+
+	return targets, nil
+}
+
+func getSSHFzfTargetsHandler(c echo.Context) error {
+	targets, err := getSSHFzfTargets()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, targets)
+}
+
 type SSHFzfRequest struct {
 	MasterPassword string `json:"masterpassword"`
 	Hostname       string `json:"hostname"`
@@ -569,6 +631,15 @@ func sshFzfHandler(c echo.Context) error {
 	var req SSHFzfRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
+	}
+
+	// If Hostname is empty, treat as target list request
+	if req.Hostname == "" {
+		targets, err := getSSHFzfTargets()
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
+		return c.JSON(http.StatusOK, targets)
 	}
 
 	conf, err := db.ReadConfig()

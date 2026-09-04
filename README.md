@@ -4,6 +4,111 @@ hostname, IPアドレス, プラットフォーム, OS, アクセスプロトコ
 
 ---
 
+## 🚀 クイックスタート & 開発・ビルド方法
+
+### 1. `./dev.sh` での開発サーバー起動 (Live Reload)
+
+Goのライブリロードツール [Air](https://github.com/air-verse/air) と Vite 開発サーバーを同時に立ち上げるシェルスクリプトが用意されています：
+
+```bash
+# フロントエンド依存関係のインストール（初回のみ）
+cd front && npm install && cd ..
+
+# 開発サーバーの一括起動
+./dev.sh
+```
+- 起動後、ブラウザで `http://localhost:5173` (Vite) または `http://localhost:8080` (Go バックエンドプロキシ) にアクセスします（証明書が存在する場合は `https://localhost:8080`）。
+- バックエンド Go コードの編集時は Air が自動検知して即座に再コンパイル・再起動し、フロントエンドは Vite HMR によりブラウザが自動更新されます。
+
+---
+
+### 2. ワンバイナリにする方法 (Single Binary Build)
+
+Vite でフロントエンドをビルドした後、Goの `go:embed` 機能によりビルド成果物 (`front/dist`) をバイナリ内に直接埋め込み、単一の自己完結実行可能ファイル（One Binary）を作成します。
+
+#### ワンクリックビルドスクリプトを使用する場合：
+```bash
+./build_linux_one_binary.sh
+```
+
+#### 手動でビルドする場合：
+```bash
+# 1. フロントエンドのビルド
+cd front && npm run build && cd ..
+
+# 2. Go単一バイナリのビルド (埋め込み)
+go build -o host-credential-manager main.go
+
+# 3. 実行
+./host-credential-manager
+```
+- 外部の静的ファイル配置や Node.js ランタイムは不要で、生成された `./host-credential-manager` 単体のみで完全動作します。
+- 待ち受けポートを変更したい場合は環境変数 `PORT` を指定します（例: `PORT=9000 ./host-credential-manager`）。
+
+---
+
+### 3. Dockerでの起動方法
+
+Multi-stage build による最小構成の Alpine コンテナとしてビルド・実行が可能です：
+
+```bash
+cd docker
+docker compose up -d
+```
+起動スクリプト `./docker/start.sh` および停止スクリプト `./docker/stop.sh` も利用できます。
+
+---
+
+### 4. `hcm-client` の開発方法 & ビルド方法
+
+ターミナルから `fzf` でホストを絞り込み、マスターパスワード認証を経て即座に対象ホストへ SSH 接続できる専用 CLI クライアントです。
+
+#### 必要パッケージ (事前準備)
+システムに `fzf` と `sshpass` がインストールされている必要があります：
+```bash
+# Ubuntu / Debian の場合
+sudo apt install fzf sshpass
+```
+
+#### 開発環境のセットアップと実行方法
+- **実行権限の付与**:
+  ```bash
+  chmod +x ./hcm-client
+  ```
+- **依存関係 (Python 3 + requests)**:
+  Python 3 標準環境、または仮想環境を作成して実行します：
+  ```bash
+  # uv を使う場合
+  uv venv && uv pip install requests
+
+  # 標準 venv を使う場合
+  python3 -m venv .venv && source .venv/bin/activate && pip install requests
+  ```
+- **開発時のテスト実行**:
+  ```bash
+  # 登録されているSSH対象一覧の取得確認 (接続を行わずに対象・ポート・ユーザーの一覧をテスト)
+  ./hcm-client --list
+
+  # 対話型 fzf による接続テスト
+  ./hcm-client
+
+  # 接続先サーバーURLや証明書を明示的に指定して実行する場合
+  ./hcm-client --url https://127.0.0.1:8080 --cert cert/cacert.pem
+  ```
+
+#### ビルド / 配布方法
+- **単体スクリプトとしての配布 (推奨)**:
+  `hcm-client` は依存パッケージを最小限（`requests` のみ）に抑えたスタンドアロンスクリプトとして実装されています。実行権限を付与するだけで、プロジェクト内の証明書 (`cert/cacert.pem` または `cert/cert.pem`) を自動認識して単体で動作します。
+- **スタンドアロン単一バイナリのビルド (PyInstaller等を使用する場合)**:
+  Python がインストールされていない環境向けに配布用実行バイナリを作成したい場合：
+  ```bash
+  pip install pyinstaller
+  pyinstaller --onefile --name hcm-client hcm-client
+  # dist/hcm-client に単一バイナリが生成されます
+  ```
+
+---
+
 ## 🌟 主な機能・特徴
 
 ### 1. 高密度・省スペースのテーブル設計 (High-Density View)
@@ -52,9 +157,15 @@ hostname, IPアドレス, プラットフォーム, OS, アクセスプロトコ
   - `user`: ホスト一覧の閲覧、パスワードの確認・コピー、パスワードジェネレータの利用（編集・削除・インポート・エクスポートは制限）。
 - セキュアなHTTP-only Cookieによるセッション管理とログアウト機能。
 
-### 8. IPアドレス制限 & CLI/FZF連携
+### 8. IPアドレス制限 & 専用SSHクライアント (`./hcm-client` / FZF連携)
 - `data/config.toml` に指定した許可IPリスト（`permit_ip_list`）に基づくクライアントアクセス制限機能を実装。
-- **CLI/FZF連携API (`/api/ssh-fzf`)**: シェルスクリプトやfzfなどのターミナルツールから、マスターパスワードを用いてホストの認証情報を直接クエリ可能。
+- **SSH対象ホスト自動リスト取得 (`GET /api/ssh-fzf`)**:
+  - `Accesslist` に `ssh`（ポート番号問わず）が設定されているホストを自動抽出。
+  - ホストと登録ユーザーの組み合わせ（ホスト名, IP, ポート, ユーザー名）を一覧で返却。
+- **専用CLIクライアント ([`./hcm-client`](file:///home/worker/Documents/antigravity/host-credential-manager-go/hcm-client))**:
+  - 本プロジェクトの証明書 (`cert/cacert.pem`) を用いて安全にHCMサーバーと通信。
+  - `fzf` によるインクリメンタル絞り込みで接続先ホスト・ユーザーを選択。
+  - マスターパスワードを入力することで安全にSSHパスワードを取得し、`sshpass` で対象サーバーへ一発接続。
 
 ### 9. TOMLデータストア & CSVインポート/エクスポート
 - **TOMLによる分離保存**:
@@ -123,6 +234,7 @@ hostname, IPアドレス, プラットフォーム, OS, アクセスプロトコ
 │   └── server/               # Echoルーティング、ミドルウェア、RBAC認証
 ├── build_linux_one_binary.sh # Linux向け単一バイナリ作成スクリプト
 ├── dev.sh                    # 開発用同時起動スクリプト (Air + Vite)
+├── hcm-client                # 専用SSHクライアント (fzf連携)
 ├── main.go                   # アプリケーションエントリーポイント
 └── README.md
 ```
@@ -146,70 +258,6 @@ user_password = 'user'
 # CLI / FZF 照会API用のマスターパスワード
 master_password = 'password'
 ```
-
----
-
-## 🚀 起動方法
-
-### 1. 開発環境での起動 (Live Reload)
-
-Goのライブリロードツール [Air](https://github.com/air-verse/air) と Vite 開発サーバーを同時に立ち上げるシェルスクリプトが用意されています：
-
-```bash
-# フロントエンド依存関係のインストール（初回のみ）
-cd front && npm install && cd ..
-
-# 開発サーバーの一括起動
-./dev.sh
-```
-
-または個別に起動する場合：
-```bash
-# ターミナル1: フロントエンド開発サーバー (http://localhost:5173)
-cd front && npm run dev
-
-# ターミナル2: Goバックエンド (http://localhost:8080)
-NODE_ENV=development go run main.go
-```
-
----
-
-### 2. プロダクション用 単一バイナリのビルド & 実行 (Linux / macOS)
-
-Viteでフロントエンドをビルドした後、Goバイナリに成果物を埋め込み、単一の実行ファイルを生成します。
-
-#### ワンクリックビルドスクリプトを使用する場合：
-```bash
-./build_linux_one_binary.sh
-```
-
-#### 手動でビルドする場合：
-```bash
-# 1. フロントエンドのビルド
-cd front
-npm run build
-cd ..
-
-# 2. Goバイナリのビルド
-go build -o host-credential-manager main.go
-
-# 3. 実行
-./host-credential-manager
-```
-
-起動後、ブラウザで `http://localhost:8080`（証明書がある場合は `https://localhost:8080`）にアクセスします。ポート番号を変更したい場合は環境変数 `PORT` を指定します（例: `PORT=9000 ./host-credential-manager`）。
-
----
-
-### 3. Dockerでの起動
-
-Dockerコンテナとしてコンパイル・実行することも可能です：
-
-```bash
-cd docker
-docker compose up -d
-```
-起動スクリプト `./docker/start.sh` および停止スクリプト `./docker/stop.sh` も利用できます。
 
 ---
 
