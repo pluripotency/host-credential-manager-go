@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
-# Ensure Go binaries (air) and Node binaries (npm) are in PATH
-# export PATH="$PATH:$(go env GOPATH 2>/dev/null || echo "$HOME/go")/bin:$HOME/.nodebrew/current/bin"
+# Ensure Go binaries (air) is in PATH
+export PATH="$PATH:$(go env GOPATH 2>/dev/null || echo "$HOME/go")/bin"
+# Ensure Node binaries (npm) is in PATH
+# export PATH="$PATH:$HOME/.nodebrew/current/bin"
 
 # Cleanup background processes upon termination
 cleanup() {
