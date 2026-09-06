@@ -60,6 +60,8 @@ func RegisterRoutes(e *echo.Echo) {
 	api.GET("/ssh-fzf/targets", getSSHFzfTargetsHandler)
 	api.POST("/ssh-fzf/targets", getSSHFzfTargetsHandler)
 	api.POST("/ssh-fzf", sshFzfHandler)
+	api.GET("/targets", getSSHFzfTargetsHandler)
+	api.POST("/targets", sshFzfHandler)
 	api.GET("/hello", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"message": "Hello from Go!"})
 	})
@@ -563,10 +565,15 @@ func generatePasswordHandler(c echo.Context) error {
 }
 
 type SSHFzfTarget struct {
-	Hostname string `json:"hostname"`
-	IP       string `json:"ip"`
-	Port     string `json:"port"`
-	Username string `json:"username"`
+	Hostname    string `json:"hostname"`
+	IP          string `json:"ip"`
+	Port        string `json:"port"`
+	Username    string `json:"username"`
+	Protocol    string `json:"protocol"`
+	Platform    string `json:"platform,omitempty"`
+	OS          string `json:"os,omitempty"`
+	Tags        string `json:"tags,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 func getSSHFzfTargets() ([]SSHFzfTarget, error) {
@@ -588,19 +595,43 @@ func getSSHFzfTargets() ([]SSHFzfTarget, error) {
 	var targets []SSHFzfTarget
 	for _, host := range hosts {
 		for _, access := range host.Accesslist {
-			if strings.ToLower(strings.TrimSpace(access.Protocol)) == "ssh" {
+			proto := strings.ToLower(strings.TrimSpace(access.Protocol))
+			if proto == "ssh" || proto == "telnet" {
 				port := strings.TrimSpace(access.Port)
 				if port == "" {
-					port = "22"
+					if proto == "telnet" {
+						port = "23"
+					} else {
+						port = "22"
+					}
 				}
 				users := credsMap[host.Hostname]
-				for _, u := range users {
+				if len(users) == 0 {
 					targets = append(targets, SSHFzfTarget{
-						Hostname: host.Hostname,
-						IP:       host.IP,
-						Port:     port,
-						Username: u.Username,
+						Hostname:    host.Hostname,
+						IP:          host.IP,
+						Port:        port,
+						Username:    "",
+						Protocol:    proto,
+						Platform:    host.Platform,
+						OS:          host.OS,
+						Tags:        host.Tags,
+						Description: host.Description,
 					})
+				} else {
+					for _, u := range users {
+						targets = append(targets, SSHFzfTarget{
+							Hostname:    host.Hostname,
+							IP:          host.IP,
+							Port:        port,
+							Username:    u.Username,
+							Protocol:    proto,
+							Platform:    host.Platform,
+							OS:          host.OS,
+							Tags:        host.Tags,
+							Description: host.Description,
+						})
+					}
 				}
 			}
 		}

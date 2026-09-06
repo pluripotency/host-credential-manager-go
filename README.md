@@ -61,50 +61,36 @@ docker compose up -d
 
 ### 4. `hcm-client` の開発方法 & ビルド方法
 
-ターミナルから `fzf` でホストを絞り込み、マスターパスワード認証を経て即座に対象ホストへ SSH 接続できる専用 CLI クライアントです。
+ターミナルからインクリメンタル検索でホストを絞り込み、マスターパスワード認証を経て即座に対象ホストへ SSH / Telnet 接続できる専用 CLI クライアントです。
+[`goplur`](../goplur) をベースに pure Go で実装されており、**Python、`fzf`、`sshpass` への依存が一切不要**で、単一の静的バイナリとして配布・実行できます。
 
-#### 必要パッケージ (事前準備)
-システムに `fzf` と `sshpass` がインストールされている必要があります：
+#### 特徴
+- **外部依存ゼロ**: Python、`fzf`、`sshpass` は不要。標準ターミナルで対話型TUI（リアルタイム絞り込み・カーソル選択）が動作します。
+- **SSH & Telnet 両対応**: Linux / AlmaLinux 9 等への SSH 接続だけでなく、Cisco等のネットワーク機器への Telnet 接続（Ctrl+] によるエスケープ切断対応）もサポート。
+- **CA証明書内蔵 (One-Binary 配布)**: ビルド時に `cert/cacert.pem` がバイナリに自己内包（`//go:embed`）されるため、自己署名CA環境下でも追加ファイル不要で単体動作します。
+
+#### ビルド方法
+`hcm-client/build.sh` を実行するだけで、Root CA証明書を取り込んで単一実行バイナリが生成されます：
 ```bash
-# Ubuntu / Debian の場合
-sudo apt install fzf sshpass
+./hcm-client/build.sh
+# ./hcm-client/hcm-client に単一バイナリが生成されます
 ```
 
-#### 開発環境のセットアップと実行方法
-- **実行権限の付与**:
+#### 実行方法
+- **登録されているCLI対象一覧の取得確認 (接続を行わずに対象・ポート・ユーザー・プロトコルの一覧をテスト)**:
   ```bash
-  chmod +x ./hcm-client
-  ```
-- **依存関係 (Python 3 + requests)**:
-  Python 3 標準環境、または仮想環境を作成して実行します：
-  ```bash
-  # uv を使う場合
-  uv venv && uv pip install requests
-
-  # 標準 venv を使う場合
-  python3 -m venv .venv && source .venv/bin/activate && pip install requests
-  ```
-- **開発時のテスト実行**:
-  ```bash
-  # 登録されているSSH対象一覧の取得確認 (接続を行わずに対象・ポート・ユーザーの一覧をテスト)
-  ./hcm-client --list
-
-  # 対話型 fzf による接続テスト
-  ./hcm-client
-
-  # 接続先サーバーURLや証明書を明示的に指定して実行する場合
-  ./hcm-client --url https://127.0.0.1:8080 --cert cert/cacert.pem
+  ./hcm-client/hcm-client --list
   ```
 
-#### ビルド / 配布方法
-- **単体スクリプトとしての配布 (推奨)**:
-  `hcm-client` は依存パッケージを最小限（`requests` のみ）に抑えたスタンドアロンスクリプトとして実装されています。実行権限を付与するだけで、プロジェクト内の証明書 (`cert/cacert.pem` または `cert/cert.pem`) を自動認識して単体で動作します。
-- **スタンドアロン単一バイナリのビルド (PyInstaller等を使用する場合)**:
-  Python がインストールされていない環境向けに配布用実行バイナリを作成したい場合：
+- **対話型 TUI による接続**:
   ```bash
-  pip install pyinstaller
-  pyinstaller --onefile --name hcm-client hcm-client
-  # dist/hcm-client に単一バイナリが生成されます
+  ./hcm-client/hcm-client
+  ```
+  文字を入力するとリアルタイムにインクリメンタル検索が行われます。上下矢印キーで対象を選択し、Enter キーを押すとマスターパスワード入力後に自動接続されます。
+
+- **接続先サーバーURLや証明書を明示的に指定して実行する場合**:
+  ```bash
+  ./hcm-client/hcm-client --url https://127.0.0.1:8080 --cert cert/cacert.pem
   ```
 
 ---
@@ -157,15 +143,16 @@ sudo apt install fzf sshpass
   - `user`: ホスト一覧の閲覧、パスワードの確認・コピー、パスワードジェネレータの利用（編集・削除・インポート・エクスポートは制限）。
 - セキュアなHTTP-only Cookieによるセッション管理とログアウト機能。
 
-### 8. IPアドレス制限 & 専用SSHクライアント (`./hcm-client` / FZF連携)
+### 8. IPアドレス制限 & 専用CLIクライアント (`./hcm-client` / goplur連携)
 - `data/config.toml` に指定した許可IPリスト（`permit_ip_list`）に基づくクライアントアクセス制限機能を実装。
-- **SSH対象ホスト自動リスト取得 (`GET /api/ssh-fzf`)**:
-  - `Accesslist` に `ssh`（ポート番号問わず）が設定されているホストを自動抽出。
-  - ホストと登録ユーザーの組み合わせ（ホスト名, IP, ポート, ユーザー名）を一覧で返却。
+- **SSH/Telnet対象ホスト自動リスト取得 (`GET /api/ssh-fzf`)**:
+  - `Accesslist` に `ssh` または `telnet`（ポート番号問わず）が設定されているホストを自動抽出。
+  - ホストと登録ユーザーの組み合わせ（ホスト名, IP, ポート, ユーザー名, プロトコル, プラットフォーム, OS）を一覧で返却。
 - **専用CLIクライアント ([`./hcm-client`](file:///home/worker/Documents/antigravity/host-credential-manager-go/hcm-client))**:
-  - 本プロジェクトの証明書 (`cert/cacert.pem`) を用いて安全にHCMサーバーと通信。
-  - `fzf` によるインクリメンタル絞り込みで接続先ホスト・ユーザーを選択。
-  - マスターパスワードを入力することで安全にSSHパスワードを取得し、`sshpass` で対象サーバーへ一発接続。
+  - `goplur` をベースにした pure Go のワンバイナリクライアント。
+  - プロジェクトの証明書 (`cert/cacert.pem`) を自己内包して安全にHCMサーバーと通信。
+  - リアルタイムインクリメンタル検索で接続先ホスト・ユーザーを選択。
+  - マスターパスワードを入力することで安全に認証パスワードを取得し、SSH または Telnet で対象サーバーへ一発接続。
 
 ### 9. TOMLデータストア & CSVインポート/エクスポート
 - **TOMLによる分離保存**:
@@ -234,7 +221,10 @@ sudo apt install fzf sshpass
 │   └── server/               # Echoルーティング、ミドルウェア、RBAC認証
 ├── build_linux_one_binary.sh # Linux向け単一バイナリ作成スクリプト
 ├── dev.sh                    # 開発用同時起動スクリプト (Air + Vite)
-├── hcm-client                # 専用SSHクライアント (fzf連携)
+├── hcm-client/               # 専用CLIクライアント (Go / goplur連携)
+│   ├── build.sh              # hcm-client ビルドスクリプト
+│   ├── cert/                 # 埋め込み用証明書 (cacert.pem)
+│   └── main.go               # hcm-client エントリーポイント
 ├── main.go                   # アプリケーションエントリーポイント
 └── README.md
 ```

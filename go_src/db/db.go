@@ -18,6 +18,9 @@ import (
 
 // DefaultProtocol returns a standard protocol for a given platform and port
 func DefaultProtocol(platform, port string) string {
+	if port == "23" {
+		return "telnet"
+	}
 	p := strings.ToLower(platform)
 	switch p {
 	case "linux", "macos", "freebsd", "cisco", "router", "switch":

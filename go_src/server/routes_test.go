@@ -151,6 +151,25 @@ func TestSSHFzfTargets(t *testing.T) {
 				{Protocol: "https", Port: "443"},
 			},
 		},
+		{
+			ID:       "h4",
+			Hostname: "telnet-switch",
+			IP:       "192.168.10.4",
+			Platform: "Cisco",
+			Accesslist: []models.AccessItem{
+				{Protocol: "telnet", Port: "23"},
+			},
+		},
+		{
+			ID:       "h5",
+			Hostname: "almalinux9-host",
+			IP:       "192.168.10.5",
+			Platform: "Linux",
+			OS:       "AlmaLinux 9",
+			Accesslist: []models.AccessItem{
+				{Protocol: "ssh", Port: "22"},
+			},
+		},
 	}
 	if err := db.WriteHostList(testHosts); err != nil {
 		t.Fatalf("failed to write test hosts: %v", err)
@@ -174,6 +193,18 @@ func TestSSHFzfTargets(t *testing.T) {
 			Hostname: "web-only-host",
 			Userlist: []models.UserCredential{
 				{Username: "webadmin", Password: "webpwd"},
+			},
+		},
+		{
+			Hostname: "telnet-switch",
+			Userlist: []models.UserCredential{
+				{Username: "cisco_admin", Password: "ciscopassword"},
+			},
+		},
+		{
+			Hostname: "almalinux9-host",
+			Userlist: []models.UserCredential{
+				{Username: "deploy", Password: "almadeploypass"},
 			},
 		},
 	}
@@ -207,6 +238,14 @@ func TestSSHFzfTargets(t *testing.T) {
 	if strings.Contains(body, "web-only-host") {
 		t.Errorf("web-only-host should not be included in ssh targets: %s", body)
 	}
+	// Should include telnet-switch with telnet protocol
+	if !strings.Contains(body, "telnet-switch") || !strings.Contains(body, "cisco_admin") || !strings.Contains(body, `"protocol":"telnet"`) {
+		t.Errorf("expected telnet-switch with telnet protocol in response: %s", body)
+	}
+	// Should include almalinux9-host with AlmaLinux 9 OS
+	if !strings.Contains(body, "almalinux9-host") || !strings.Contains(body, "AlmaLinux 9") {
+		t.Errorf("expected almalinux9-host in response: %s", body)
+	}
 
 	// 2. Test POST /api/ssh-fzf without hostname (returns targets)
 	postReq := httptest.NewRequest(http.MethodPost, "/api/ssh-fzf", strings.NewReader(`{"masterpassword":"password"}`))
@@ -238,6 +277,22 @@ func TestSSHFzfTargets(t *testing.T) {
 	}
 	if !strings.Contains(pwdRec.Body.String(), "pwd1") {
 		t.Errorf("expected pwd1 in response, got: %s", pwdRec.Body.String())
+	}
+
+	// 4. Test POST /api/ssh-fzf for telnet-switch password
+	telnetPwdReq := httptest.NewRequest(http.MethodPost, "/api/ssh-fzf", strings.NewReader(`{"masterpassword":"password","hostname":"telnet-switch","username":"cisco_admin"}`))
+	telnetPwdReq.Header.Set("Content-Type", "application/json")
+	telnetPwdRec := httptest.NewRecorder()
+	telnetPwdCtx := e.NewContext(telnetPwdReq, telnetPwdRec)
+
+	if err := sshFzfHandler(telnetPwdCtx); err != nil {
+		t.Fatalf("sshFzfHandler returned error: %v", err)
+	}
+	if telnetPwdRec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", telnetPwdRec.Code)
+	}
+	if !strings.Contains(telnetPwdRec.Body.String(), "ciscopassword") {
+		t.Errorf("expected ciscopassword in response, got: %s", telnetPwdRec.Body.String())
 	}
 }
 

@@ -20,6 +20,7 @@ const PROTOCOL_OPTIONS = [
   { label: "HTTP", value: "http", defaultPort: "80" },
   { label: "HTTPS", value: "https", defaultPort: "443" },
   { label: "SSH", value: "ssh", defaultPort: "22" },
+  { label: "Telnet", value: "telnet", defaultPort: "23" },
   { label: "RDP", value: "rdp", defaultPort: "3389" },
   { label: "MySQL", value: "mysql", defaultPort: "3306" },
   { label: "PostgreSQL", value: "postgres", defaultPort: "5432" },

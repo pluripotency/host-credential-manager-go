@@ -146,10 +146,24 @@ var hostListSeed = []models.Host{
 		Hostname:    "switch-floor2-core",
 		IP:          "192.168.20.2",
 		Platform:    "Cisco",
-		Port:        "22",
-		Tags:        "network,infrastructure,switch",
-		Description: "Floor 2 server rack aggregation core gigabit switch",
+		Port:        "23",
+		Tags:        "network,infrastructure,switch,cisco,telnet",
+		Description: "Floor 2 server rack aggregation core gigabit switch (Telnet & SSH)",
 		UpdatedAt:   "2026-06-10T11:22:00Z",
+		Accesslist: []models.AccessItem{
+			{Protocol: "telnet", Port: "23"},
+			{Protocol: "ssh", Port: "22"},
+		},
+	},
+	{
+		Hostname:    "almalinux9-srv01.internal",
+		IP:          "10.0.3.50",
+		Platform:    "Linux",
+		OS:          "AlmaLinux 9",
+		Port:        "22",
+		Tags:        "production,database,almalinux9,ssh",
+		Description: "AlmaLinux 9 enterprise database and application node",
+		UpdatedAt:   "2026-06-21T09:00:00Z",
 		Accesslist: []models.AccessItem{
 			{Protocol: "ssh", Port: "22"},
 		},
@@ -469,6 +483,13 @@ var hostUserCredSeed = []models.HostCredentials{
 		Hostname: "prometheus-scraper",
 		Userlist: []models.UserCredential{
 			{Username: "prometheus", Password: "Prm_Scrp_Sec_2026_Prom"},
+		},
+	},
+	{
+		Hostname: "almalinux9-srv01.internal",
+		Userlist: []models.UserCredential{
+			{Username: "deploy", Password: "Alma9_Deploy_2026_Secure!"},
+			{Username: "root", Password: "Alma9_Root_SecPass_2026!"},
 		},
 	},
 }
