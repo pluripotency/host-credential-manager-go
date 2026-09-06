@@ -1,15 +1,23 @@
 package server
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -56,12 +64,13 @@ func RegisterRoutes(e *echo.Echo) {
 	api.POST("/login", loginHandler)
 	api.POST("/logout", logoutHandler)
 	api.GET("/role", roleHandler)
-	api.GET("/ssh-fzf", getSSHFzfTargetsHandler)
-	api.GET("/ssh-fzf/targets", getSSHFzfTargetsHandler)
-	api.POST("/ssh-fzf/targets", getSSHFzfTargetsHandler)
-	api.POST("/ssh-fzf", sshFzfHandler)
-	api.GET("/targets", getSSHFzfTargetsHandler)
-	api.POST("/targets", sshFzfHandler)
+	cliGroup := api.Group("", RequireClientCertMiddleware("cert/crl.pem"))
+	cliGroup.GET("/ssh-fzf", getSSHFzfTargetsHandler)
+	cliGroup.GET("/ssh-fzf/targets", getSSHFzfTargetsHandler)
+	cliGroup.POST("/ssh-fzf/targets", getSSHFzfTargetsHandler)
+	cliGroup.POST("/ssh-fzf", sshFzfHandler)
+	cliGroup.GET("/targets", getSSHFzfTargetsHandler)
+	cliGroup.POST("/targets", sshFzfHandler)
 	api.GET("/hello", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"message": "Hello from Go!"})
 	})
@@ -70,6 +79,7 @@ func RegisterRoutes(e *echo.Echo) {
 	adminOrUserGroup := api.Group("", RequireAuth("admin", "user"))
 	adminOrUserGroup.GET("/hostlist", getHostList)
 	adminOrUserGroup.GET("/password/generate", generatePasswordHandler)
+	adminOrUserGroup.GET("/client/download", downloadHcmClientHandler)
 
 	adminOnlyGroup := api.Group("", RequireAuth("admin"))
 	adminOnlyGroup.POST("/hostlist", createHost)
@@ -836,5 +846,153 @@ func roleHandler(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{"role": role})
+}
+
+func findRepoRoot() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "."
+	}
+	for i := 0; i < 5; i++ {
+		if _, errMod := os.Stat(filepath.Join(dir, "go.mod")); errMod == nil {
+			if _, errHcm := os.Stat(filepath.Join(dir, "hcm-client")); errHcm == nil {
+				return dir
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return "."
+}
+
+var clientBuildMutex sync.Mutex
+
+func downloadHcmClientHandler(c echo.Context) error {
+	clientBuildMutex.Lock()
+	defer clientBuildMutex.Unlock()
+
+	repoRoot := findRepoRoot()
+	builtDir := filepath.Join(repoRoot, "hcm-client", "built")
+	_ = os.MkdirAll(builtDir, 0755)
+
+	binaryPath := filepath.Join(builtDir, "hcm-client")
+
+	// If binary does not exist or certs were renewed after build, trigger build
+	needBuild := false
+	if binInfo, err := os.Stat(binaryPath); os.IsNotExist(err) {
+		needBuild = true
+	} else if caInfo, err := os.Stat(filepath.Join(repoRoot, "cert", "cacert.pem")); err == nil && caInfo.ModTime().After(binInfo.ModTime()) {
+		needBuild = true
+	} else if clientCertInfo, err := os.Stat(filepath.Join(repoRoot, "cert", "client_cert.pem")); err == nil && clientCertInfo.ModTime().After(binInfo.ModTime()) {
+		needBuild = true
+	}
+
+	if needBuild {
+		buildScript := filepath.Join(repoRoot, "hcm-client", "build.sh")
+		if _, errScript := os.Stat(buildScript); errScript == nil {
+			cmd := exec.Command(buildScript)
+			cmd.Dir = repoRoot
+			out, errBuild := cmd.CombinedOutput()
+			if errBuild != nil {
+				return c.JSON(http.StatusInternalServerError, map[string]string{
+					"error": fmt.Sprintf("Failed to build hcm-client: %v (%s)", errBuild, string(out)),
+				})
+			}
+		} else {
+			// Fallback: build via go build directly
+			cmd := exec.Command("go", "build", "-ldflags=-s -w", "-o", binaryPath, "./hcm-client")
+			cmd.Dir = repoRoot
+			out, errBuild := cmd.CombinedOutput()
+			if errBuild != nil {
+				return c.JSON(http.StatusInternalServerError, map[string]string{
+					"error": fmt.Sprintf("Failed to compile hcm-client: %v (%s)", errBuild, string(out)),
+				})
+			}
+		}
+	}
+
+	// Verify binary exists now
+	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "hcm-client binary is missing and could not be built",
+		})
+	}
+
+	// Buffer tar.gz in memory
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gw)
+
+	// Walk builtDir and add files
+	err := filepath.Walk(builtDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		relPath, err := filepath.Rel(builtDir, path)
+		if err != nil {
+			return err
+		}
+
+		if relPath == "." {
+			return nil
+		}
+
+		header, err := tar.FileInfoHeader(info, info.Name())
+		if err != nil {
+			return err
+		}
+
+		// Ensure tar entry path is clean relative path with root folder hcm-client/
+		header.Name = filepath.ToSlash(filepath.Join("hcm-client", relPath))
+
+		// Set proper executable permissions
+		if info.IsDir() {
+			header.Mode = 0755
+		} else if strings.HasSuffix(header.Name, "hcm-client") || strings.HasSuffix(header.Name, ".sh") {
+			header.Mode = 0755
+		} else {
+			header.Mode = 0644
+		}
+
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		_, err = io.Copy(tw, file)
+		return err
+	})
+
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("Failed to create archive: %v", err),
+		})
+	}
+
+	if err := tw.Close(); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	if err := gw.Close(); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	c.Response().Header().Set("Content-Type", "application/gzip")
+	c.Response().Header().Set("Content-Disposition", `attachment; filename="hcm-client.tgz"`)
+	c.Response().Header().Set("Content-Length", strconv.Itoa(buf.Len()))
+
+	return c.Blob(http.StatusOK, "application/gzip", buf.Bytes())
 }
 

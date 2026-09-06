@@ -67,31 +67,44 @@ docker compose up -d
 #### 特徴
 - **外部依存ゼロ**: Python、`fzf`、`sshpass` は不要。標準ターミナルで対話型TUI（リアルタイム絞り込み・カーソル選択）が動作します。
 - **SSH & Telnet 両対応**: Linux / AlmaLinux 9 等への SSH 接続だけでなく、Cisco等のネットワーク機器への Telnet 接続（Ctrl+] によるエスケープ切断対応）もサポート。
-- **CA証明書内蔵 (One-Binary 配布)**: ビルド時に `cert/cacert.pem` がバイナリに自己内包（`//go:embed`）されるため、自己署名CA環境下でも追加ファイル不要で単体動作します。
+- **Mutual TLS (mTLS) 認証 & CA更新失効**: クライアント証明書と Root CA 証明書をバイナリ内に `//go:embed`。サーバー証明書/CA更新時は古いクライアントが即座に無効化されます。
+- **CRL (証明書失効リスト) 対応**: クライアント証明書が失効された場合、直ちにサーバー側で接続を遮断可能。
 
-#### ビルド方法
-`hcm-client/build.sh` を実行するだけで、Root CA証明書を取り込んで単一実行バイナリが生成されます：
+#### ビルド & パッケージング方法
+`hcm-client/build.sh` を実行すると、Root CA証明書およびクライアント証明書を取り込んで単一実行バイナリが生成されます：
 ```bash
 ./hcm-client/build.sh
-# ./hcm-client/hcm-client に単一バイナリが生成されます
+# ./hcm-client/built/ 配下に hcm-client, run.sh, 証明書一式が生成されます
 ```
+
+#### Web UI からのダウンロード
+Web UI のトップバー右上にある「hcm-client.tgz」ボタンをクリックすると、最新の証明書が取り込まれたクライアント一式をダウンロードできます。
 
 #### 実行方法
 - **登録されているCLI対象一覧の取得確認 (接続を行わずに対象・ポート・ユーザー・プロトコルの一覧をテスト)**:
   ```bash
-  ./hcm-client/hcm-client --list
+  ./hcm-client/built/hcm-client --list
   ```
 
 - **対話型 TUI による接続**:
   ```bash
-  ./hcm-client/hcm-client
+  ./hcm-client/built/run.sh
   ```
   文字を入力するとリアルタイムにインクリメンタル検索が行われます。上下矢印キーで対象を選択し、Enter キーを押すとマスターパスワード入力後に自動接続されます。
 
 - **接続先サーバーURLや証明書を明示的に指定して実行する場合**:
   ```bash
-  ./hcm-client/hcm-client --url https://127.0.0.1:8080 --cert cert/cacert.pem
+  ./hcm-client/built/hcm-client --url https://127.0.0.1:8080 --cert cert/cacert.pem --client-cert cert/client_cert.pem --client-key cert/client_key.pem
   ```
+
+#### 証明書生成 & CRL失効運用
+```bash
+# 証明書・CAの一括新規生成・初期化 (Root CA, Server cert, Client cert, CRL)
+./cert/create_certs.sh
+
+# 特定のクライアント証明書の失効 (CRL更新)
+./cert/revoke_cert.sh cert/client_cert.pem
+```
 
 ---
 
@@ -168,7 +181,7 @@ docker compose up -d
 ### 10. 自動TLS / HTTPS 対応
 - サーバー起動時に `cert/cert.pem` および `cert/key.pem` を自動検出し、証明書が存在する場合は自動的に **HTTPSモード (TLS)** で起動。
 - 証明書が存在しない場合は自動的に通常の **HTTPモード** で起動。
-- ローカル証明書作成スクリプト (`cert/create_certs.sh`) や、ブラウザ接続時のTLSエラーに関するドキュメント (`docs/about_cert_err.md`) を完備。
+- ローカル証明書作成スクリプト (`cert/create_certs.sh`)、Mutual TLS仕様・運用ガイド (`docs/mutual_tls.md`)、ブラウザ接続時のTLSエラーに関するドキュメント (`docs/about_cert_err.md`) を完備。
 
 ### 11. 単一バイナリ (Single Binary) アーキテクチャ
 - Goの `go:embed` 機能を使用し、Reactフロントエンドのビルド成果物 (`front/dist`) をGoバイナリ内に完全内包。
@@ -207,7 +220,8 @@ docker compose up -d
 │   ├── docker-compose.yml    # コンテナ定義
 │   └── start.sh / stop.sh    # 起動・停止スクリプト
 ├── docs/                     # 詳細ドキュメント
-│   └── about_cert_err.md     # TLSハンドシェイクエラーの原因と対処法
+│   ├── about_cert_err.md     # TLSハンドシェイクエラーの原因と対処法
+│   └── mutual_tls.md         # Mutual TLS (mTLS) 仕様 & CRL失効・復旧運用ガイド
 ├── front/                    # Reactフロントエンド (Vite + TypeScript)
 │   ├── src/
 │   │   ├── components/       # UIコンポーネント (CredentialForm, Login, etc.)

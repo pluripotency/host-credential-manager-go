@@ -1,8 +1,11 @@
 # Compiled binaries and executables
 host-credential-manager
 host-credential-manager.exe
+hcm-server
 hcm-client/hcm-client
 hcm-client/hcm-client.exe
+hcm-client/built/hcm-client
+hcm-client/built/hcm-client.exe
 *.exe
 *.exe~
 *.dll
@@ -24,6 +27,7 @@ data/
 # cert pem
 cert/*.pem
 hcm-client/cert/*.pem
+hcm-client/built/cert/*.pem
 
 # OS-specific files
 .DS_Store

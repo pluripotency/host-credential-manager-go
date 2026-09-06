@@ -70,10 +70,21 @@ func main() {
 
 	certFile := "cert/cert.pem"
 	keyFile := "cert/key.pem"
+	caCertFile := "cert/cacert.pem"
+	crlFile := "cert/crl.pem"
 	if _, errCert := os.Stat(certFile); errCert == nil {
 		if _, errKey := os.Stat(keyFile); errKey == nil {
-			e.Logger.Info("Certificates found. Starting server in HTTPS mode...")
-			e.Logger.Fatal(e.StartTLS(":"+port, certFile, keyFile))
+			e.Logger.Info("Certificates found. Starting server in HTTPS mode with mTLS support...")
+			tlsConfig, err := server.BuildTLSConfig(certFile, keyFile, caCertFile, crlFile)
+			if err != nil {
+				e.Logger.Fatalf("Failed to initialize TLS config: %v", err)
+			}
+			s := &http.Server{
+				Addr:      ":" + port,
+				Handler:   e,
+				TLSConfig: tlsConfig,
+			}
+			e.Logger.Fatal(s.ListenAndServeTLS(certFile, keyFile))
 			return
 		}
 	}

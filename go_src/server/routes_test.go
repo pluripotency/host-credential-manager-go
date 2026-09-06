@@ -1,7 +1,17 @@
 package server
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"io"
+	"math/big"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +19,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"host-credential-manager-go/go_src/db"
@@ -293,6 +304,185 @@ func TestSSHFzfTargets(t *testing.T) {
 	}
 	if !strings.Contains(telnetPwdRec.Body.String(), "ciscopassword") {
 		t.Errorf("expected ciscopassword in response, got: %s", telnetPwdRec.Body.String())
+	}
+}
+
+func TestDownloadHcmClient(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/api/client/download", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := downloadHcmClientHandler(c); err != nil {
+		t.Fatalf("downloadHcmClientHandler returned error: %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	contentType := rec.Header().Get("Content-Type")
+	if !strings.Contains(contentType, "application/gzip") {
+		t.Errorf("expected Content-Type application/gzip, got %s", contentType)
+	}
+
+	contentDisposition := rec.Header().Get("Content-Disposition")
+	if !strings.Contains(contentDisposition, "hcm-client.tgz") {
+		t.Errorf("expected Content-Disposition to have hcm-client.tgz, got %s", contentDisposition)
+	}
+
+	// Verify tar.gz contents
+	gr, err := gzip.NewReader(rec.Body)
+	if err != nil {
+		t.Fatalf("failed to create gzip reader: %v", err)
+	}
+	defer gr.Close()
+
+	tr := tar.NewReader(gr)
+	foundBinary := false
+	foundRunScript := false
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("tar reading error: %v", err)
+		}
+		if strings.HasSuffix(hdr.Name, "hcm-client") {
+			foundBinary = true
+		}
+		if strings.HasSuffix(hdr.Name, "run.sh") {
+			foundRunScript = true
+		}
+	}
+
+	if !foundBinary {
+		t.Errorf("expected hcm-client binary in tar archive")
+	}
+	if !foundRunScript {
+		t.Errorf("expected run.sh in tar archive")
+	}
+}
+
+func TestRequireClientCertMiddleware(t *testing.T) {
+	e := echo.New()
+
+	// Generate a CA cert
+	caPrivKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	caTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "TestCA"},
+		NotBefore:             time.Now().Add(-1 * time.Hour),
+		NotAfter:              time.Now().Add(1 * time.Hour),
+		IsCA:                  true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		BasicConstraintsValid: true,
+	}
+	caDER, _ := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caPrivKey.PublicKey, caPrivKey)
+	caCert, _ := x509.ParseCertificate(caDER)
+
+	// Generate Client Cert (Valid)
+	clientPrivKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	clientTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(100),
+		Subject:      pkix.Name{CommonName: "client-valid"},
+		NotBefore:    time.Now().Add(-1 * time.Hour),
+		NotAfter:     time.Now().Add(1 * time.Hour),
+	}
+	clientDER, _ := x509.CreateCertificate(rand.Reader, clientTemplate, caCert, &clientPrivKey.PublicKey, caPrivKey)
+	validCert, _ := x509.ParseCertificate(clientDER)
+
+	// Generate Client Cert (Revoked)
+	revokedTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(200),
+		Subject:      pkix.Name{CommonName: "client-revoked"},
+		NotBefore:    time.Now().Add(-1 * time.Hour),
+		NotAfter:     time.Now().Add(1 * time.Hour),
+	}
+	revokedDER, _ := x509.CreateCertificate(rand.Reader, revokedTemplate, caCert, &clientPrivKey.PublicKey, caPrivKey)
+	revokedCert, _ := x509.ParseCertificate(revokedDER)
+
+	// Create CRL with revoked serial 200
+	crlTemplate := &x509.RevocationList{
+		Number:     big.NewInt(1),
+		ThisUpdate: time.Now().Add(-1 * time.Minute),
+		NextUpdate: time.Now().Add(1 * time.Hour),
+		RevokedCertificateEntries: []x509.RevocationListEntry{
+			{
+				SerialNumber:   big.NewInt(200),
+				RevocationTime: time.Now(),
+			},
+		},
+	}
+	crlDER, err := x509.CreateRevocationList(rand.Reader, crlTemplate, caCert, caPrivKey)
+	if err != nil {
+		t.Fatalf("failed to create test CRL: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	crlPath := filepath.Join(tmpDir, "crl.pem")
+	crlPEM := pem.EncodeToMemory(&pem.Block{Type: "X509 CRL", Bytes: crlDER})
+	_ = os.WriteFile(crlPath, crlPEM, 0644)
+
+	handler := func(c echo.Context) error {
+		return c.String(http.StatusOK, "success")
+	}
+	middleware := RequireClientCertMiddleware(crlPath)
+
+	// 1. Request without TLS (c.Request().TLS == nil)
+	reqNoTLS := httptest.NewRequest(http.MethodGet, "/api/ssh-fzf", nil)
+	recNoTLS := httptest.NewRecorder()
+	cNoTLS := e.NewContext(reqNoTLS, recNoTLS)
+	_ = middleware(handler)(cNoTLS)
+	if recNoTLS.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for request without TLS, got %d", recNoTLS.Code)
+	}
+
+	// 2. Request with TLS but without peer certificates
+	reqNoCerts := httptest.NewRequest(http.MethodGet, "/api/ssh-fzf", nil)
+	reqNoCerts.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{}}
+	recNoCerts := httptest.NewRecorder()
+	cNoCerts := e.NewContext(reqNoCerts, recNoCerts)
+	_ = middleware(handler)(cNoCerts)
+	if recNoCerts.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for request without client cert, got %d", recNoCerts.Code)
+	}
+
+	// 3. Request with valid client certificate
+	reqValid := httptest.NewRequest(http.MethodGet, "/api/ssh-fzf", nil)
+	reqValid.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{validCert}}
+	recValid := httptest.NewRecorder()
+	cValid := e.NewContext(reqValid, recValid)
+	_ = middleware(handler)(cValid)
+	if recValid.Code != http.StatusOK {
+		t.Errorf("expected 200 for valid client cert, got %d: %s", recValid.Code, recValid.Body.String())
+	}
+
+	// 4. Request with revoked client certificate
+	reqRevoked := httptest.NewRequest(http.MethodGet, "/api/ssh-fzf", nil)
+	reqRevoked.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{revokedCert}}
+	recRevoked := httptest.NewRecorder()
+	cRevoked := e.NewContext(reqRevoked, recRevoked)
+	_ = middleware(handler)(cRevoked)
+	if recRevoked.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for revoked client cert, got %d", recRevoked.Code)
+	}
+	if !strings.Contains(recRevoked.Body.String(), "revoked") {
+		t.Errorf("expected 'revoked' error message, got: %s", recRevoked.Body.String())
+	}
+}
+
+func TestIsCertRevoked(t *testing.T) {
+	// Test nil handling
+	if IsCertRevoked("", nil) {
+		t.Errorf("expected false for nil cert")
+	}
+
+	// Test non-existent file
+	cert := &x509.Certificate{SerialNumber: big.NewInt(999)}
+	if IsCertRevoked("non_existent_crl.pem", cert) {
+		t.Errorf("expected false for non existent crl file")
 	}
 }
 

@@ -3,7 +3,7 @@ import {
   Server, Key, Search, Plus, Edit2, Trash2, Copy, Check, Eye, EyeOff, 
   Download, Upload, RefreshCw, X, 
   Lock, ArrowUpDown, 
-  AlertCircle, Info, LogOut, Globe, ExternalLink
+  AlertCircle, Info, LogOut, Globe, ExternalLink, Terminal
 } from "lucide-react";
 import './index.css'
 import type { HostList, TableDensity } from "./types";
@@ -424,6 +424,17 @@ export default function ManagerApp() {
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
               <span>Reload</span>
             </button>
+
+            {/* Download hcm-client Button */}
+            <a
+              href="/api/client/download"
+              download="hcm-client.tgz"
+              title="Download hcm-client CLI package (hcm-client.tgz)"
+              className="p-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-600 hover:text-slate-800 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+            >
+              <Terminal className="w-3.5 h-3.5 text-indigo-500" />
+              <span>hcm-client.tgz</span>
+            </a>
 
             {/* Import Button */}
             {role === "admin" && (
