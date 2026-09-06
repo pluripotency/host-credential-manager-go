@@ -19,8 +19,8 @@
    - `GET /api/ssh-fzf`（または `/api/targets`）へリクエストを送信し、SSH / Telnet 接続が可能なノード一覧（ホスト名、IP、ポート、ユーザー名、プロトコル、OS、タグ）を取得。
 2. **対話型 TUI (インクリメンタル検索)**:
    - `golang.org/x/term` の Raw モードを用いて、端末上でリアルタイムなインクリメンタルフィルタリング（複数トークン AND 検索）と上下キーによるカーソル選択を提供。
-3. **マスターパスワード認証 & パスワード取得**:
-   - 選択されたホストに対して `POST /api/ssh-fzf` を送信し、HCM サーバーのマスターパスワードで復号された対象ノードのログインパスワードを取得（画面やディスクには一切残しません）。
+3. **マスターパスワード照合 & パスワード取得**:
+   - 選択されたホストに対して `POST /api/ssh-fzf` を送信し、HCM サーバーのマスターパスワード照合を経て対象ノードのログインパスワードを取得（画面やディスクには一切残しません）。
 4. **セッション接続 (`goplur`)**:
    - **SSH**: `goplur.NewSshNode` を作成し、Pty 経由でログインパスワードを自動送出して `s.Interact()` へ移行。
    - **Telnet**: `goplur.NewTelnetNode` を作成し、Telnet ログインシーケンスおよび `Ctrl+]` エスケープ切断ハンドラを登録して対話セッションを起動。
@@ -41,18 +41,28 @@
 ```
 
 このスクリプトは以下の処理を自動で行います：
-1. `cert/cacert.pem` を検出し、バイナリ埋め込み用 (`hcm-client/cert/`) および配布用 (`hcm-client/built/cert/`) に同期。
+1. `cert/cacert.pem`、`cert/client_cert.pem`、`cert/client_key.pem` を検出し、バイナリ埋め込み用 (`hcm-client/cert/`) および配布用 (`hcm-client/built/cert/`) に同期。
 2. Go コンパイラで最適化・シンボル除去（`-ldflags="-s -w"`）を行い、`hcm-client/built/hcm-client` に単一バイナリを出力。
 3. 実行権限を付与。
 
-### 2. 手動でのコンパイル
-手動でビルドする場合は、プロジェクトルートから以下を実行します：
+### 2. 手動・クロスプラットフォームコンパイル (macOS / Windows)
+事前に証明書ファイルを `hcm-client/cert/` に配置した上で、ターゲット OS を指定してビルドします：
 
 ```bash
+# 証明書の同期（初回または証明書更新時）
+mkdir -p hcm-client/cert
+cp cert/cacert.pem cert/client_cert.pem cert/client_key.pem hcm-client/cert/
+
 # Linux x86_64 向けビルド
 go build -ldflags="-s -w" -o hcm-client/built/hcm-client ./hcm-client
 
-# 他プラットフォーム向けのクロスコンパイル例 (Windows)
+# macOS (Apple Silicon / M1, M2, M3) 向けビルド
+GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o hcm-client/built/hcm-client-darwin-arm64 ./hcm-client
+
+# macOS (Intel CPU) 向けビルド
+GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o hcm-client/built/hcm-client-darwin-amd64 ./hcm-client
+
+# Windows 向けビルド (.exe)
 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o hcm-client/built/hcm-client.exe ./hcm-client
 ```
 
@@ -148,3 +158,22 @@ almalinux9-srv01.internal    SSH      deploy         10.0.3.50:22         Linux 
 - クライアント証明書が漏洩または退役した場合、CA全体を再生成することなく特定の証明書を無効化できます。
 - サーバー管理者は `./cert/revoke_cert.sh` を実行することで `cert/crl.pem` に失効情報を登録します。
 - サーバーは TLS 接続時およびエンドポイント受信時にリアルタイムに CRL を参照し、失効された証明書での接続を直ちに遮断 (`tls: bad certificate`) します。
+
+---
+
+## 💡 接続時のヒント & トラブルシューティング
+
+### 1. Telnet 接続時のエスケープ切断
+Telnet 接続時に対象機器からログアウトせずに強制切断したい場合は、**`Ctrl + ]`** を入力して `telnet>` プロンプトを表示させた後、`quit` と入力して Enter を押してください。
+
+### 2. 主なエラーと解決手順
+
+| エラー | 原因 | 対処方法 |
+| :--- | :--- | :--- |
+| `remote error: tls: bad certificate` | クライアント証明書が CRL で失効されている | Web UI にログインして新しい `hcm-client.tgz` を再ダウンロードしてください。 |
+| `remote error: tls: unknown certificate authority` | サーバー側で CA が更新された | Web UI にログインして最新の `hcm-client.tgz` を再ダウンロードしてください。 |
+| `status 401: Client certificate required (mTLS)` | クライアント証明書なしで接続した | 正規の `hcm-client` を使用しているか、または HTTPS で接続しているか確認してください。 |
+| `status 401: Invalid masterpassword` | マスターパスワード不一致 | サーバー側 `data/config.toml` の `masterpassword` を確認してください。 |
+| `status 403: Forbidden` | 接続元 IP が許可されていない | サーバー側の `data/config.toml` の `permit_ip_list` に自端末の IP を追加してください。 |
+
+より詳細なエラー対応は [docs/troubleshooting.md](../docs/troubleshooting.md) をご参照ください。

@@ -86,7 +86,7 @@ SERVER_IP=192.168.1.100 SERVER_PORT=8443 ./run.sh
    - `ESC` キー、または `Ctrl + C`
 5. **マスターパスワード入力**:
    - 確定後、HCMサーバーのマスターパスワード入力プロンプト（画面上に文字は非表示）が表示されます。
-   - 正しいパスワードを入力すると、暗号化保管されていた認証パスワードが取得され、SSH または Telnet の対話型セッションが自動的に起動します。
+    - 正しいパスワードを入力すると、マスターパスワード照合を経て認証パスワードが取得され、SSH または Telnet の対話型セッションが自動的に起動します。
 6. **セッション切断**:
    - SSH: `exit` または `Ctrl + D`
    - Telnet: `exit` または `Ctrl + ]`（エスケープ切断後に `quit`）
@@ -101,3 +101,15 @@ SERVER_IP=192.168.1.100 SERVER_PORT=8443 ./run.sh
   HCM サーバー側で CA 証明書が再生成された場合、古いバイナリは TLS レベルで自動的に接続拒否されます。HCM Web UI から最新の `hcm-client.tgz` を再ダウンロードしてください。
 - **証明書の失効時 (CRL)**:
   クライアント証明書がサーバー管理者によって失効（Revoke）された場合、接続は即座に拒否 (`tls: bad certificate`) されます。
+
+---
+
+## 💡 エラー発生時の対処法
+
+| エラー | 主な原因 | 対処方法 |
+| :--- | :--- | :--- |
+| `remote error: tls: bad certificate` | 証明書が CRL で失効されている | Web UI にログインし、新しい `hcm-client.tgz` を再ダウンロードしてください。 |
+| `remote error: tls: unknown certificate authority` | サーバー側で CA が更新された | Web UI にログインし、最新の `hcm-client.tgz` を再ダウンロードしてください。 |
+| `status 401: Client certificate required` | クライアント証明書なしで接続した | 正規の `run.sh` または `hcm-client` バイナリを使用してください。 |
+| `status 401: Invalid masterpassword` | マスターパスワードが違う | サーバー側管理者にマスターパスワードを確認してください。 |
+| `status 403: Forbidden` | 接続元 IP が許可されていない | サーバー側の `data/config.toml` の `permit_ip_list` に自端末の IP を追加してもらってください。 |

@@ -6,6 +6,21 @@ hostname, IPアドレス, プラットフォーム, OS, アクセスプロトコ
 
 ## 🚀 クイックスタート & 開発・ビルド方法
 
+### 0. 初期アカウント & ログイン情報
+初回起動時、`data/config.toml` に以下の初期認証情報が設定されます：
+
+| アカウント種別 | ユーザー名 | 初期パスワード | 権限・役割 |
+| :--- | :--- | :--- | :--- |
+| **管理者 (Admin)** | `admin` | `admin` | 全操作（ホスト作成・編集・削除、CSV入出力等） |
+| **一般ユーザー (User)** | `user` | `user` | ホスト一覧閲覧、パスワード生成、クライアントDL |
+| **マスターパスワード** | - | `password` | CLI (`hcm-client`) / API 経由でのホスト接続パスワード照合 |
+
+> [!CAUTION]
+> **初期設定の変更（必須）**:
+> 初回起動後は直ちに `data/config.toml` を開き、各パスワードの変更および必要に応じた接続元 IP の追加（`permit_ip_list`）を行ってサーバーを再起動してください。詳細は [docs/security_and_roles.md](docs/security_and_roles.md) をご参照ください。
+
+---
+
 ### 1. `./dev.sh` での開発サーバー起動 (Live Reload)
 
 Goのライブリロードツール [Air](https://github.com/air-verse/air) と Vite 開発サーバーを同時に立ち上げるシェルスクリプトが用意されています：
@@ -176,7 +191,9 @@ Web UI のトップバー右上にある「hcm-client.tgz」ボタンをクリ�
   - ドラッグ＆ドロップまたはファイル選択に対応。
   - 既存データに追記する「マージ (Merge)」と、全データを置き換える「上書き (Overwrite)」の2モードを選択可能。
 - **CSVエクスポート**:
-  - 1クリックで現在の全ホストデータ（OS、AccessListのJSON表現を含む）をCSV形式でバックアップダウンロード。
+  - 1クリックで現在の全ホストデータ（OS、AccessListのJSON表現を含む）をCSV形式でダウンロード。
+  > [!WARNING]
+  > **重要（CSVのバックアップ制限）**: CSV エクスポートにはセキュリティ上、**各ホストのユーザー名およびパスワードは含まれません（`csv:"-"`）**。完全なバックアップ（パスワード含む）やディザスタリカバリの手順については、必ず [docs/backup_and_recovery.md](docs/backup_and_recovery.md) をご参照ください。
 
 ### 10. 自動TLS / HTTPS 対応
 - サーバー起動時に `cert/cert.pem` および `cert/key.pem` を自動検出し、証明書が存在する場合は自動的に **HTTPSモード (TLS)** で起動。
@@ -219,9 +236,13 @@ Web UI のトップバー右上にある「hcm-client.tgz」ボタンをクリ�
 │   ├── Dockerfile            # マルチステージビルドDockerfile
 │   ├── docker-compose.yml    # コンテナ定義
 │   └── start.sh / stop.sh    # 起動・停止スクリプト
-├── docs/                     # 詳細ドキュメント
+├── docs/                     # 詳細ドキュメント・運用ガイド
 │   ├── about_cert_err.md     # TLSハンドシェイクエラーの原因と対処法
-│   └── mutual_tls.md         # Mutual TLS (mTLS) 仕様 & CRL失効・復旧運用ガイド
+│   ├── backup_and_recovery.md# バックアップ・リストア・CSV入出力仕様
+│   ├── check.md              # 運用仕様・ドキュメント精査レポート
+│   ├── mutual_tls.md         # Mutual TLS (mTLS) 仕様 & CRL失効・復旧運用ガイド
+│   ├── security_and_roles.md # セキュリティ・アカウント・RBAC権限仕様
+│   └── troubleshooting.md    # トラブルシューティング & エラー対応ガイド
 ├── front/                    # Reactフロントエンド (Vite + TypeScript)
 │   ├── src/
 │   │   ├── components/       # UIコンポーネント (CredentialForm, Login, etc.)
@@ -240,6 +261,7 @@ Web UI のトップバー右上にある「hcm-client.tgz」ボタンをクリ�
 │   ├── cert/                 # 埋め込み用証明書 (cacert.pem)
 │   └── main.go               # hcm-client エントリーポイント
 ├── main.go                   # アプリケーションエントリーポイント
+├── sync-obsidian.sh          # Obsidian appdocs (ドキュメント) 同期スクリプト
 └── README.md
 ```
 
@@ -260,15 +282,24 @@ admin_password = 'admin'
 user_password = 'user'
 
 # CLI / FZF 照会API用のマスターパスワード
-master_password = 'password'
+masterpassword = 'password'
 ```
 
 ---
 
-## 🔒 セキュリティと証明書について
+## 🔒 セキュリティ・運用ドキュメント
 
-- **HTTPSモード**: `cert/cert.pem` および `cert/key.pem` が配置されている場合、サーバーは自動的にTLS暗号化通信で起動します。
-- **TLSハンドシェイクエラーについて**:
-  自己署名証明書を使用している場合、ブラウザアクセス時に `tls: unknown certificate` というエラーログが出力されることがあります。詳細な原因および対処方法については [docs/about_cert_err.md](docs/about_cert_err.md) をご参照ください。
-- **HTTPモードで動作させたい場合**:
-  `cert/cert.pem` または `cert/key.pem` の名前を変更するか削除してサーバーを再起動すると、自動的にHTTPモードで動作します。
+より詳細な運用・仕様解説については、以下のドキュメントをご参照ください：
+
+- **アカウント・権限・セキュリティ**: [docs/security_and_roles.md](docs/security_and_roles.md)  
+  - 初期パスワード、Admin / User ロール権限対比、TOML平文保存とファイル権限保護、IPアドレス制限の仕様
+- **バックアップ & リストア**: [docs/backup_and_recovery.md](docs/backup_and_recovery.md)  
+  - 完全データ移行手順、CSV エクスポートの制限（パスワードが含まれないことへの注意）
+- **Mutual TLS (mTLS) & CRL 失効**: [docs/mutual_tls.md](docs/mutual_tls.md)  
+  - 双方向 TLS 認証、CA更新による旧クライアント自動失効、CRL による証明書失効
+- **トラブルシューティング**: [docs/troubleshooting.md](docs/troubleshooting.md)  
+  - エラーメッセージ別対応表、クライアント復旧手順、macOS/Windows向けクロスコンパイル手順
+- **TLS ハンドシェイクエラー解説**: [docs/about_cert_err.md](docs/about_cert_err.md)  
+  - ブラウザアクセス時の自己署名証明書警告の理由と対処法
+- **運用仕様精査レポート**: [docs/check.md](docs/check.md)  
+  - 実装と仕様の対照レポートおよび改善項目一覧
