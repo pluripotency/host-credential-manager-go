@@ -401,7 +401,7 @@ export default function ManagerApp() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-extrabold text-sm tracking-tight leading-none">Host Database</h1>
+                <h1 className="font-extrabold text-sm tracking-tight leading-none">Host Credential Manager</h1>
                 <span className="text-[10px] bg-slate-800 border border-slate-700 text-slate-300 font-mono px-1.5 py-0.2 rounded-full font-bold">
                   v2.0
                 </span>
