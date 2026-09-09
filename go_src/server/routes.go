@@ -853,17 +853,31 @@ func findRepoRoot() string {
 	if err != nil {
 		return "."
 	}
+	// First pass: look for development/source tree with go.mod
+	curr := dir
 	for i := 0; i < 5; i++ {
-		if _, errMod := os.Stat(filepath.Join(dir, "go.mod")); errMod == nil {
-			if _, errHcm := os.Stat(filepath.Join(dir, "hcm-client")); errHcm == nil {
-				return dir
+		if _, errMod := os.Stat(filepath.Join(curr, "go.mod")); errMod == nil {
+			if _, errHcm := os.Stat(filepath.Join(curr, "hcm-client")); errHcm == nil {
+				return curr
 			}
 		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
+		parent := filepath.Dir(curr)
+		if parent == curr {
 			break
 		}
-		dir = parent
+		curr = parent
+	}
+	// Second pass: for minimal deployment/container environments without go.mod
+	curr = dir
+	for i := 0; i < 5; i++ {
+		if _, errBuilt := os.Stat(filepath.Join(curr, "hcm-client", "built")); errBuilt == nil {
+			return curr
+		}
+		parent := filepath.Dir(curr)
+		if parent == curr {
+			break
+		}
+		curr = parent
 	}
 	return "."
 }
@@ -891,24 +905,31 @@ func downloadHcmClientHandler(c echo.Context) error {
 	}
 
 	if needBuild {
+		var buildErr error
+		var buildOut []byte
+
 		buildScript := filepath.Join(repoRoot, "hcm-client", "build.sh")
 		if _, errScript := os.Stat(buildScript); errScript == nil {
 			cmd := exec.Command(buildScript)
 			cmd.Dir = repoRoot
-			out, errBuild := cmd.CombinedOutput()
-			if errBuild != nil {
-				return c.JSON(http.StatusInternalServerError, map[string]string{
-					"error": fmt.Sprintf("Failed to build hcm-client: %v (%s)", errBuild, string(out)),
-				})
-			}
-		} else {
+			buildOut, buildErr = cmd.CombinedOutput()
+		} else if _, errLook := exec.LookPath("go"); errLook == nil {
 			// Fallback: build via go build directly
 			cmd := exec.Command("go", "build", "-ldflags=-s -w", "-o", binaryPath, "./hcm-client")
 			cmd.Dir = repoRoot
-			out, errBuild := cmd.CombinedOutput()
-			if errBuild != nil {
+			buildOut, buildErr = cmd.CombinedOutput()
+		} else {
+			buildErr = fmt.Errorf("neither build.sh nor go compiler found in environment")
+		}
+
+		if buildErr != nil {
+			// If binary already exists (e.g. pre-built in Docker image), do not fail with 500.
+			// Log a warning and proceed with the existing binary and updated cert files.
+			if _, errStat := os.Stat(binaryPath); errStat == nil {
+				c.Logger().Warnf("hcm-client rebuild skipped (%v: %s); serving existing binary with updated certs", buildErr, string(buildOut))
+			} else {
 				return c.JSON(http.StatusInternalServerError, map[string]string{
-					"error": fmt.Sprintf("Failed to compile hcm-client: %v (%s)", errBuild, string(out)),
+					"error": fmt.Sprintf("Failed to build hcm-client: %v (%s)", buildErr, string(buildOut)),
 				})
 			}
 		}
@@ -919,6 +940,18 @@ func downloadHcmClientHandler(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "hcm-client binary is missing and could not be built",
 		})
+	}
+
+	// Ensure latest certs from repoRoot/cert are copied into builtDir/cert for packaging
+	certSrcDir := filepath.Join(repoRoot, "cert")
+	certDstDir := filepath.Join(builtDir, "cert")
+	_ = os.MkdirAll(certDstDir, 0755)
+	for _, certName := range []string{"cacert.pem", "client_cert.pem", "client_key.pem"} {
+		srcPath := filepath.Join(certSrcDir, certName)
+		dstPath := filepath.Join(certDstDir, certName)
+		if srcData, errRead := os.ReadFile(srcPath); errRead == nil {
+			_ = os.WriteFile(dstPath, srcData, 0644)
+		}
 	}
 
 	// Buffer tar.gz in memory
