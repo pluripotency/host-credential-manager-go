@@ -538,7 +538,8 @@ func fallbackSelect(targets []Target) (Target, error) {
 }
 
 func connectSSH(target Target, password string) error {
-	node := goplur.NewSshNode(target.Hostname, target.IP, target.Username, password, target.Platform)
+	node := goplur.NewSshNode(target.Hostname, target.IP, target.Username, password, target.Platform).
+		WithDirectMode(true)
 	node.SSHPort = target.ResolvedPort()
 
 	logParams := goplur.DefaultLogParams()
@@ -548,12 +549,13 @@ func connectSSH(target Target, password string) error {
 		fmt.Printf(" Connected to %s (%s) via SSH. Interactive shell ready.\n", target.Hostname, target.IP)
 		fmt.Println(" Type 'exit' or press Ctrl+D to disconnect.")
 		fmt.Println("--------------------------------------------------------------------------------")
-		return s.Interact()
+		return s.Interact(goplur.WithoutCommands())
 	})
 }
 
 func connectTelnet(target Target, password string) error {
-	node := goplur.NewTelnetNode(target.Hostname, target.IP, target.Username, password, target.Platform)
+	node := goplur.NewTelnetNode(target.Hostname, target.IP, target.Username, password, target.Platform).
+		WithDirectMode(true)
 	node.TelnetPort = target.ResolvedPort()
 	node.WithEscapeExit()
 
@@ -564,6 +566,6 @@ func connectTelnet(target Target, password string) error {
 		fmt.Printf(" Connected to %s (%s) via Telnet. Interactive terminal ready.\n", target.Hostname, target.IP)
 		fmt.Println(" Disconnect via exit or Telnet escape (Ctrl+], then quit).")
 		fmt.Println("--------------------------------------------------------------------------------")
-		return s.Interact()
+		return s.Interact(goplur.WithoutCommands())
 	})
 }

@@ -9,7 +9,7 @@ require (
 	goplur v0.0.0-00010101000000-000000000000
 )
 
-replace goplur => github.com/pluripotency/goplur v0.0.0-20260905015517-0ab5b068019e
+replace goplur => ../goplur
 
 require (
 	github.com/google/goterm v0.0.0-20190703233501-fc88cf888a3f // indirect
