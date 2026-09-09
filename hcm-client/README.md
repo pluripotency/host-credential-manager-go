@@ -2,7 +2,7 @@
 
 `hcm-client` は、Host Credential Manager (HCM) サーバーに登録されたホスト一覧（SSH / Telnet）を取得し、ターミナル上で対話的に検索・選択して安全かつ自動的に接続を行う専用 CLI クライアントです。
 
-[`goplur`](../../goplur) を基盤エンジンとして採用し、**Python、`requests`、`fzf`、`sshpass` などの外部依存パッケージを一切必要としない Pure Go 製の単一実行バイナリ（One-Binary）** として設計されています。
+[`goplur`](https://github.com/pluripotency/goplur) を基盤エンジンとして採用し、**Python、`requests`、`fzf`、`sshpass` などの外部依存パッケージを一切必要としない Pure Go 製の単一実行バイナリ（One-Binary）** として設計されています。
 
 ---
 

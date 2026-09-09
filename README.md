@@ -77,7 +77,7 @@ docker compose up -d
 ### 4. `hcm-client` の開発方法 & ビルド方法
 
 ターミナルからインクリメンタル検索でホストを絞り込み、マスターパスワード認証を経て即座に対象ホストへ SSH / Telnet 接続できる専用 CLI クライアントです。
-[`goplur`](../goplur) をベースに pure Go で実装されており、**Python、`fzf`、`sshpass` への依存が一切不要**で、単一の静的バイナリとして配布・実行できます。
+[`goplur`](https://github.com/pluripotency/goplur) をベースに pure Go で実装されており、**Python、`fzf`、`sshpass` への依存が一切不要**で、単一の静的バイナリとして配布・実行できます。
 
 #### 特徴
 - **外部依存ゼロ**: Python、`fzf`、`sshpass` は不要。標準ターミナルで対話型TUI（リアルタイム絞り込み・カーソル選択）が動作します。
