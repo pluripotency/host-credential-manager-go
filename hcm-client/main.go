@@ -545,10 +545,10 @@ func connectSSH(target Target, password string) error {
 	logParams := goplur.DefaultLogParams()
 
 	return goplur.RunSsh(node, &logParams, func(s *goplur.Session) error {
-		fmt.Println("--------------------------------------------------------------------------------")
-		fmt.Printf(" Connected to %s (%s) via SSH. Interactive shell ready.\n", target.Hostname, target.IP)
-		fmt.Println(" Type 'exit' or press Ctrl+D to disconnect.")
-		fmt.Println("--------------------------------------------------------------------------------")
+		// fmt.Println("--------------------------------------------------------------------------------")
+		fmt.Printf("\n Connected to %s (%s). goplur shell ready.\n", target.Hostname, target.IP)
+		// fmt.Println(" Type 'exit' or press Ctrl+D to disconnect.")
+		// fmt.Println("--------------------------------------------------------------------------------")
 		return s.Interact(goplur.WithoutCommands())
 	})
 }
