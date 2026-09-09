@@ -1,5 +1,6 @@
 services:
-  app:
+  hcm:
+    container_name: hcm
     build:
       context: ..
       dockerfile: docker/Dockerfile
