@@ -1,0 +1,382 @@
+[[host]]
+hostname = 'ssh-prod-web01.internal'
+ip = '10.0.2.14'
+platform = 'Linux'
+os = ''
+tags = 'production,web,frontend'
+description = 'Frontend web proxy running Nginx and Node.js proxy'
+updatedAt = '2026-06-20T10:30:00Z'
+
+[[host.accesslist]]
+protocol = 'http'
+port = '3000'
+path = '/app'
+
+[[host.accesslist]]
+protocol = 'https'
+port = '8080'
+path = '/admin'
+
+[[host.accesslist]]
+protocol = 'ssh'
+port = '10022'
+
+[[host]]
+hostname = 'db-mysql-master.cluster'
+ip = '10.0.4.5'
+platform = 'MySQL'
+os = ''
+tags = 'production,database,replica-set'
+description = 'Primary transactional database for user accounts'
+updatedAt = '2026-06-21T08:15:00Z'
+
+[[host.accesslist]]
+protocol = 'mysql'
+port = '3306'
+
+[[host]]
+hostname = 'ad-controller.corp.local'
+ip = '192.168.10.10'
+platform = 'Windows'
+os = ''
+tags = 'corp,active-directory,auth'
+description = 'Active Directory Domain Controller for office employees'
+updatedAt = '2026-06-19T14:20:00Z'
+
+[[host.accesslist]]
+protocol = 'ldap'
+port = '389'
+
+[[host.accesslist]]
+protocol = 'rdp'
+port = '3389'
+
+[[host]]
+hostname = 'router-core-border.net'
+ip = '172.16.1.1'
+platform = 'Cisco'
+os = ''
+tags = 'network,infrastructure,edge'
+description = 'Core border gateway router facing ISP upstream'
+updatedAt = '2026-06-22T11:05:00Z'
+
+[[host.accesslist]]
+protocol = 'ssh'
+port = '22'
+
+[[host.accesslist]]
+protocol = 'https'
+port = '443'
+
+[[host]]
+hostname = 'aws-rds-postgres.us-east-1.rds.amazonaws.com'
+ip = '54.210.12.89'
+platform = 'PostgreSQL'
+os = ''
+tags = 'aws,database,production'
+description = 'AWS RDS managed instance for analytics & business reports'
+updatedAt = '2026-06-23T16:40:00Z'
+
+[[host.accesslist]]
+protocol = 'postgres'
+port = '5432'
+
+[[host]]
+hostname = 'vcenter-mgmt.local'
+ip = '10.50.0.100'
+platform = 'VMware'
+os = ''
+tags = 'mgmt,virtualization,vsphere'
+description = 'vCenter Server Appliance managing host clusters'
+updatedAt = '2026-06-18T09:00:00Z'
+
+[[host.accesslist]]
+protocol = 'https'
+port = '443'
+path = '/ui'
+
+[[host]]
+hostname = 'esxi-node-03.local'
+ip = '10.50.0.103'
+platform = 'VMware'
+os = ''
+tags = 'infrastructure,virtualization,hypervisor'
+description = 'Baremetal ESXi hypervisor node hosting staging VMs'
+updatedAt = '2026-06-18T09:12:00Z'
+
+[[host.accesslist]]
+protocol = 'ssh'
+port = '22'
+
+[[host.accesslist]]
+protocol = 'https'
+port = '443'
+path = '/host'
+
+[[host]]
+hostname = 'redis-cache-01.internal'
+ip = '10.0.8.20'
+platform = 'Redis'
+os = ''
+tags = 'cache,internal,performance'
+description = 'In-memory database for application session caching'
+updatedAt = '2026-06-25T12:00:00Z'
+
+[[host.accesslist]]
+protocol = 'redis'
+port = '6379'
+
+[[host]]
+hostname = 'windows-jumpbox.corp.local'
+ip = '192.168.10.25'
+platform = 'Windows'
+os = ''
+tags = 'corp,access,security'
+description = 'RDP Jump Host for developer staging environment access'
+updatedAt = '2026-06-15T15:30:00Z'
+
+[[host.accesslist]]
+protocol = 'rdp'
+port = '3389'
+
+[[host]]
+hostname = 'git-gitlab.internal.net'
+ip = '10.0.10.150'
+platform = 'Linux'
+os = ''
+tags = 'devops,vcs,self-hosted'
+description = 'GitLab Enterprise self-hosted code repository manager'
+updatedAt = '2026-06-24T17:15:00Z'
+
+[[host.accesslist]]
+protocol = 'https'
+port = '443'
+path = '/explore'
+
+[[host.accesslist]]
+protocol = 'ssh'
+port = '22'
+
+[[host]]
+hostname = 'jenkins-ci-controller'
+ip = '10.0.10.160'
+platform = 'Linux'
+os = ''
+tags = 'devops,ci-cd,automation'
+description = 'Jenkins automation controller executing builds and deployments'
+updatedAt = '2026-06-24T17:45:00Z'
+
+[[host.accesslist]]
+protocol = 'http'
+port = '8080'
+path = '/blue'
+
+[[host.accesslist]]
+protocol = 'ssh'
+port = '10022'
+
+[[host]]
+hostname = 'switch-floor2-core'
+ip = '192.168.20.2'
+platform = 'Cisco'
+os = ''
+tags = 'network,infrastructure,switch,cisco,telnet'
+description = 'Floor 2 server rack aggregation core gigabit switch (Telnet & SSH)'
+updatedAt = '2026-06-10T11:22:00Z'
+
+[[host.accesslist]]
+protocol = 'telnet'
+port = '23'
+
+[[host.accesslist]]
+protocol = 'ssh'
+port = '22'
+
+[[host]]
+hostname = 'almalinux9-srv01.internal'
+ip = '10.0.3.50'
+platform = 'Linux'
+os = 'AlmaLinux 9'
+tags = 'production,database,almalinux9,ssh'
+description = 'AlmaLinux 9 enterprise database and application node'
+updatedAt = '2026-06-21T09:00:00Z'
+
+[[host.accesslist]]
+protocol = 'ssh'
+port = '22'
+
+[[host]]
+hostname = 'mongodb-replica-01'
+ip = '10.0.6.11'
+platform = 'MongoDB'
+os = ''
+tags = 'database,nosql,staging'
+description = 'MongoDB Replica Set Primary database for catalog services'
+updatedAt = '2026-06-20T14:50:00Z'
+
+[[host.accesslist]]
+protocol = 'mongodb'
+port = '27017'
+
+[[host]]
+hostname = 'pve-cluster-node1'
+ip = '10.20.0.11'
+platform = 'Proxmox'
+os = ''
+tags = 'virtualization,homelab,private-cloud'
+description = 'Proxmox Virtual Environment node running container clusters'
+updatedAt = '2026-06-22T08:44:00Z'
+
+[[host.accesslist]]
+protocol = 'https'
+port = '8006'
+path = '/#v1:0:=node%2Fpve-cluster-node1'
+
+[[host]]
+hostname = 'k8s-master-01.infra'
+ip = '10.120.0.10'
+platform = 'Kubernetes'
+os = ''
+tags = 'production,orchestration,containers'
+description = 'Kubernetes control plane API master node 1'
+updatedAt = '2026-06-25T11:10:00Z'
+
+[[host.accesslist]]
+protocol = 'https'
+port = '6443'
+path = '/api/v1'
+
+[[host.accesslist]]
+protocol = 'ssh'
+port = '22'
+
+[[host]]
+hostname = 'nas-backup-vault'
+ip = '192.168.1.200'
+platform = 'FreeNAS'
+os = ''
+tags = 'storage,backup,redundant'
+description = 'TrueNAS secure storage server with automated backup pools'
+updatedAt = '2026-06-12T03:00:00Z'
+
+[[host.accesslist]]
+protocol = 'https'
+port = '443'
+path = '/ui/system/info'
+
+[[host]]
+hostname = 'opnsense-firewall.local'
+ip = '192.168.1.1'
+platform = 'OPNsense'
+os = ''
+tags = 'network,security,gateway'
+description = 'OPNsense Core edge firewall routing & VPN endpoint'
+updatedAt = '2026-06-24T10:00:00Z'
+
+[[host.accesslist]]
+protocol = 'https'
+port = '443'
+path = '/ui/dashboard'
+
+[[host]]
+hostname = 'api-gateway.prod.cloud'
+ip = '3.120.45.188'
+platform = 'AWS'
+os = ''
+tags = 'production,gateway,load-balancer'
+description = 'Kong API Gateway proxying internet requests to backend microservices'
+updatedAt = '2026-06-25T15:20:00Z'
+
+[[host.accesslist]]
+protocol = 'https'
+port = '443'
+path = '/status'
+
+[[host.accesslist]]
+protocol = 'http'
+port = '80'
+
+[[host]]
+hostname = 'mac-builder-01.internal'
+ip = '10.0.10.201'
+platform = 'macOS'
+os = ''
+tags = 'devops,ios,runner'
+description = 'Apple Mac Mini hosting CI build agent for iOS client compiling'
+updatedAt = '2026-06-14T12:00:00Z'
+
+[[host.accesslist]]
+protocol = 'ssh'
+port = '22'
+
+[[host]]
+hostname = 'dns-pihole.local'
+ip = '192.168.1.5'
+platform = 'Linux'
+os = ''
+tags = 'network,dns,internal'
+description = 'Pi-hole local DNS server, ad blocker, and local domain routing'
+updatedAt = '2026-06-25T08:00:00Z'
+
+[[host.accesslist]]
+protocol = 'http'
+port = '80'
+path = '/admin'
+
+[[host]]
+hostname = 'db-oracle-erp.corp'
+ip = '10.5.1.20'
+platform = 'Oracle'
+os = ''
+tags = 'database,enterprise,billing'
+description = 'Oracle Database instance holding corporate ERP financials'
+updatedAt = '2026-06-05T14:30:00Z'
+
+[[host.accesslist]]
+protocol = 'oracle'
+port = '1521'
+
+[[host]]
+hostname = 'nginx-load-balancer-01'
+ip = '10.0.2.10'
+platform = 'Linux'
+os = ''
+tags = 'production,load-balancer,network'
+description = 'Main incoming layer 7 HTTP load balancer'
+updatedAt = '2026-06-25T14:00:00Z'
+
+[[host.accesslist]]
+protocol = 'http'
+port = '80'
+
+[[host.accesslist]]
+protocol = 'https'
+port = '443'
+
+[[host]]
+hostname = 'grafana-monitoring'
+ip = '10.0.30.12'
+platform = 'Grafana'
+os = ''
+tags = 'monitoring,ops,metrics'
+description = 'Grafana analytics visualizer for system dashboard metric tracking'
+updatedAt = '2026-06-25T16:00:00Z'
+
+[[host.accesslist]]
+protocol = 'http'
+port = '3000'
+path = '/dashboards'
+
+[[host]]
+hostname = 'prometheus-scraper'
+ip = '10.0.30.10'
+platform = 'Linux'
+os = ''
+tags = 'monitoring,ops,telemetry'
+description = 'Prometheus server scraping cluster nodes and exporter endpoints'
+updatedAt = '2026-06-25T16:10:00Z'
+
+[[host.accesslist]]
+protocol = 'http'
+port = '9090'
+path = '/graph'

@@ -24,11 +24,11 @@ server-b,192.168.1.11,Windows,3389,db;staging,Staging DB server,2026-01-02T00:00
 		t.Fatalf("expected 2 hosts, got %d", len(hosts))
 	}
 
-	if hosts[0].Hostname != "server-a" || hosts[0].IP != "192.168.1.10" || hosts[0].Platform != "Linux" || hosts[0].Port != "22" || hosts[0].Tags != "web;prod" || hosts[0].Description != "Primary web server" {
+	if hosts[0].Hostname != "server-a" || hosts[0].IP != "192.168.1.10" || hosts[0].Platform != "Linux" || len(hosts[0].Accesslist) != 1 || hosts[0].Accesslist[0].Port != "22" || hosts[0].Tags != "web;prod" || hosts[0].Description != "Primary web server" {
 		t.Errorf("unexpected host[0] data: %+v", hosts[0])
 	}
 
-	if hosts[1].Hostname != "server-b" || hosts[1].IP != "192.168.1.11" || hosts[1].Platform != "Windows" || hosts[1].Port != "3389" || hosts[1].Tags != "db;staging" || hosts[1].Description != "Staging DB server" {
+	if hosts[1].Hostname != "server-b" || hosts[1].IP != "192.168.1.11" || hosts[1].Platform != "Windows" || len(hosts[1].Accesslist) != 1 || hosts[1].Accesslist[0].Port != "3389" || hosts[1].Tags != "db;staging" || hosts[1].Description != "Staging DB server" {
 		t.Errorf("unexpected host[1] data: %+v", hosts[1])
 	}
 }
@@ -58,7 +58,6 @@ func TestWriteHostListToCsv(t *testing.T) {
 			Hostname:    "web01",
 			IP:          "10.0.0.1",
 			Platform:    "Linux",
-			Port:        "22",
 			Tags:        "web",
 			Description: "Main web",
 			UpdatedAt:   "2026-01-01T00:00:00.000Z",
@@ -119,7 +118,6 @@ func TestReadWriteHostListToml(t *testing.T) {
 			Hostname:    "host-one",
 			IP:          "172.16.0.1",
 			Platform:    "Ubuntu",
-			Port:        "22",
 			Tags:        "test",
 			Description: "Test host",
 			UpdatedAt:   "2026-01-01T12:00:00Z",
@@ -129,7 +127,6 @@ func TestReadWriteHostListToml(t *testing.T) {
 			Hostname:    "host-two",
 			IP:          "172.16.0.2",
 			Platform:    "Debian",
-			Port:        "22",
 			Tags:        "test2",
 			Description: "Test host 2",
 			UpdatedAt:   "2026-01-01T12:00:00Z",
@@ -172,7 +169,6 @@ id = '999'
 hostname = 'legacy-host'
 ip = '10.99.99.99'
 platform = 'Linux'
-port = '22'
 tags = 'legacy'
 description = 'Legacy host'
 updatedAt = '2026-01-01T00:00:00Z'
@@ -210,7 +206,6 @@ func TestReadWriteAccessListToml(t *testing.T) {
 			Hostname: "web-server-test",
 			IP:       "192.168.1.100",
 			Platform: "Linux",
-			Port:     "80",
 			Accesslist: []models.AccessItem{
 				{Protocol: "http", Port: "8080", Path: "/app"},
 				{Protocol: "https", Port: "8443", Path: "/admin"},

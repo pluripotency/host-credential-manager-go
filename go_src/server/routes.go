@@ -142,11 +142,17 @@ func createHost(c echo.Context) error {
 		IP:          strings.TrimSpace(req.IP),
 		Platform:    req.Platform,
 		OS:          strings.TrimSpace(req.OS),
-		Port:        strings.TrimSpace(req.Port),
 		Tags:        strings.TrimSpace(req.Tags),
 		Description: strings.TrimSpace(req.Description),
 		UpdatedAt:   time.Now().UTC().Format("2006-01-02T15:04:05.000Z"),
 		Accesslist:  req.Accesslist,
+	}
+
+	if len(newHost.Accesslist) == 0 && req.Port != "" {
+		proto := db.DefaultProtocol(newHost.Platform, req.Port)
+		newHost.Accesslist = []models.AccessItem{
+			{Protocol: proto, Port: strings.TrimSpace(req.Port)},
+		}
 	}
 
 	hosts = append([]models.Host{newHost}, hosts...)
@@ -234,9 +240,6 @@ func updateHost(c echo.Context) error {
 	}
 	if req.OS != nil {
 		hosts[index].OS = strings.TrimSpace(*req.OS)
-	}
-	if req.Port != nil {
-		hosts[index].Port = strings.TrimSpace(*req.Port)
 	}
 	if req.Tags != nil {
 		hosts[index].Tags = strings.TrimSpace(*req.Tags)
@@ -439,7 +442,6 @@ func importHosts(c echo.Context) error {
 			IP:          strings.TrimSpace(item.IP),
 			Platform:    platform,
 			OS:          strings.TrimSpace(item.OS),
-			Port:        strings.TrimSpace(item.Port),
 			Tags:        strings.TrimSpace(item.Tags),
 			Description: strings.TrimSpace(item.Description),
 			UpdatedAt:   updatedAt,

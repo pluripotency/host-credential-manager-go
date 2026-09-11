@@ -15,7 +15,7 @@ export interface HostList {
   ip: string;
   platform: string;
   os?: string;
-  port: string;
+  port?: string;
   tags: string;
   description: string;
   updatedAt: string;

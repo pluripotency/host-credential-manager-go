@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 
+# Move to the script's directory to ensure relative paths work
+cd "$(dirname "$0")"
+
+if [ ! -d "./config" ]; then
+  echo "Copying ./test_config to ./config..."
+  cp -r ./test_config ./config
+fi
+
 # Ensure Go binaries (air) is in PATH
 export PATH="$PATH:$(go env GOPATH 2>/dev/null || echo "$HOME/go")/bin"
 # Ensure Node binaries (npm) is in PATH

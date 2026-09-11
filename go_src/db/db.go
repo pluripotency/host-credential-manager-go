@@ -72,40 +72,6 @@ func InitDatabase() error {
 		return fmt.Errorf("failed to create data dir: %w", err)
 	}
 
-	// Seed hostlist.toml if it does not exist
-	if _, err := os.Stat(tomlFilePath); os.IsNotExist(err) {
-		if err := writeHostListTOML(tomlFilePath, hostListSeed); err != nil {
-			return fmt.Errorf("failed to seed hostlist.toml: %w", err)
-		}
-		fmt.Printf("Host Database (TOML) seeded successfully with %d hosts (hostlist.toml)!\n", len(hostListSeed))
-	}
-
-	// Seed host_credentials.toml if it does not exist
-	if _, err := os.Stat(credTomlFilePath); os.IsNotExist(err) {
-		if err := writeHostCredentialsTOML(credTomlFilePath, hostUserCredSeed); err != nil {
-			return fmt.Errorf("failed to seed host_credentials.toml: %w", err)
-		}
-		fmt.Printf("Host Credentials Database seeded successfully with %d credentials!\n", len(hostUserCredSeed))
-	}
-
-	// Seed config.toml if it does not exist
-	if _, err := os.Stat(configFilePath); os.IsNotExist(err) {
-		conf := models.Config{
-			PermitIPList:   []string{"127.0.0.1"},
-			MasterPassword: "password",
-			AdminPassword:  "admin",
-			UserPassword:   "user",
-		}
-		data, err := toml.Marshal(conf)
-		if err != nil {
-			return fmt.Errorf("failed to marshal config: %w", err)
-		}
-		if err := os.WriteFile(configFilePath, data, 0644); err != nil {
-			return fmt.Errorf("failed to write config.toml: %w", err)
-		}
-		fmt.Println("Config file config.toml initialized with default IP permit list, masterpassword, admin_password, and user_password!")
-	}
-
 	return nil
 }
 
@@ -168,12 +134,6 @@ func ReadHostList() ([]models.Host, error) {
 
 	for i := range hostList.Host {
 		hostList.Host[i].ID = strconv.Itoa(i + 1)
-		if len(hostList.Host[i].Accesslist) == 0 && hostList.Host[i].Port != "" {
-			proto := DefaultProtocol(hostList.Host[i].Platform, hostList.Host[i].Port)
-			hostList.Host[i].Accesslist = []models.AccessItem{
-				{Protocol: proto, Port: hostList.Host[i].Port},
-			}
-		}
 	}
 
 	return hostList.Host, nil
@@ -235,7 +195,6 @@ func ReadHostListFromCsv(r io.Reader) ([]models.Host, error) {
 			IP:          getVal("ip"),
 			Platform:    platformVal,
 			OS:          getVal("os"),
-			Port:        portVal,
 			Tags:        getVal("tags"),
 			Description: getVal("description"),
 			UpdatedAt:   getVal("updatedAt"),
@@ -298,7 +257,7 @@ func WriteHostListToCsv(w io.Writer, hosts []models.Host) error {
 	writer := csv.NewWriter(w)
 	defer writer.Flush()
 
-	header := []string{"hostname", "ip", "platform", "os", "port", "tags", "description", "updatedAt", "accesslist"}
+	header := []string{"hostname", "ip", "platform", "os", "tags", "description", "updatedAt", "accesslist"}
 	if err := writer.Write(header); err != nil {
 		return err
 	}
@@ -310,7 +269,6 @@ func WriteHostListToCsv(w io.Writer, hosts []models.Host) error {
 			host.IP,
 			host.Platform,
 			host.OS,
-			host.Port,
 			host.Tags,
 			host.Description,
 			host.UpdatedAt,

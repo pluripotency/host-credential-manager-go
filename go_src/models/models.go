@@ -27,7 +27,6 @@ type Host struct {
 	IP          string           `json:"ip" csv:"ip" toml:"ip"`
 	Platform    string           `json:"platform" csv:"platform" toml:"platform"`
 	OS          string           `json:"os" csv:"os" toml:"os"`
-	Port        string           `json:"port" csv:"port" toml:"port"`
 	Tags        string           `json:"tags" csv:"tags" toml:"tags"`
 	Description string           `json:"description" csv:"description" toml:"description"`
 	UpdatedAt   string           `json:"updatedAt" csv:"updatedAt" toml:"updatedAt"`

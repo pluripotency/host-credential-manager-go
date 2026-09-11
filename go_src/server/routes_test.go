@@ -49,10 +49,12 @@ func TestExportHosts(t *testing.T) {
 			Hostname:    "export-test-host",
 			IP:          "192.168.1.50",
 			Platform:    "Linux",
-			Port:        "22",
 			Tags:        "test",
 			Description: "Export test",
 			UpdatedAt:   "2026-01-01T00:00:00.000Z",
+			Accesslist: []models.AccessItem{
+				{Protocol: "ssh", Port: "22"},
+			},
 		},
 	}
 	if err := db.WriteHostList(testHosts); err != nil {
