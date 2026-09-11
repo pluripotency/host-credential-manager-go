@@ -7,6 +7,6 @@ services:
     image: host-credential-manager-go:latest
     network_mode: "host"
     volumes:
-      - ../data:/root/data
+      - ../config:/root/config
       - ../cert:/root/cert
     restart: always

@@ -55,7 +55,7 @@ func DefaultProtocol(platform, port string) string {
 }
 
 var (
-	dataDir          = "./data"
+	dataDir          = "./config"
 	tomlFilePath     = filepath.Join(dataDir, "hostlist.toml")
 	credTomlFilePath = filepath.Join(dataDir, "host_credentials.toml")
 	configFilePath   = filepath.Join(dataDir, "config.toml")
