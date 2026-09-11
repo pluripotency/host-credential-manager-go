@@ -22,7 +22,7 @@ hcm-client/built/hcm-client.exe
 tmp/
 
 # Local database store (automatically seeded/created at runtime)
-data/
+config/
 
 # cert pem
 cert/*.pem
