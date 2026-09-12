@@ -9,7 +9,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"io"
 	"math/big"
 	"mime/multipart"
@@ -487,4 +489,282 @@ func TestIsCertRevoked(t *testing.T) {
 		t.Errorf("expected false for non existent crl file")
 	}
 }
+
+func TestGetTabsHandler(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/api/tabs", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := getTabsHandler(c); err != nil {
+		t.Fatalf("getTabsHandler returned error: %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+}
+
+func TestTabIntegration(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalDataDir := db.GetDataDir()
+	defer func() {
+		db.SetDataDir(originalDataDir)
+	}()
+
+	db.SetDataDir(tmpDir)
+
+	// Write tab_config.toml
+	tabConfigToml := `
+[[tab]]
+name = 'tabA'
+dirpath = './tabA'
+list_filename = 'hostlist.toml'
+cred_filename = 'hostcredentials.toml'
+
+[[tab]]
+name = 'tabB'
+dirpath = './tabB'
+list_filename = 'hostlist.toml'
+cred_filename = 'hostcredentials.toml'
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "tab_config.toml"), []byte(tabConfigToml), 0644); err != nil {
+		t.Fatalf("failed to write tab_config: %v", err)
+	}
+
+	tabADir := filepath.Join(tmpDir, "tabA")
+	tabBDir := filepath.Join(tmpDir, "tabB")
+	_ = os.MkdirAll(tabADir, 0755)
+	_ = os.MkdirAll(tabBDir, 0755)
+
+	_ = os.WriteFile(filepath.Join(tabADir, "hostlist.toml"), []byte("[[host]]\nhostname = 'host-a'\nip = '10.0.0.1'\nplatform = 'Linux'\n"), 0644)
+	_ = os.WriteFile(filepath.Join(tabADir, "hostcredentials.toml"), []byte("[[host]]\nhostname = 'host-a'\n[[host.userlist]]\nusername = 'usera'\npassword = 'pwda'\n"), 0644)
+
+	_ = os.WriteFile(filepath.Join(tabBDir, "hostlist.toml"), []byte("[[host]]\nhostname = 'host-b'\nip = '10.0.0.2'\nplatform = 'Windows'\n"), 0644)
+	_ = os.WriteFile(filepath.Join(tabBDir, "hostcredentials.toml"), []byte("[[host]]\nhostname = 'host-b'\n[[host.userlist]]\nusername = 'userb'\npassword = 'pwdb'\n"), 0644)
+
+	// 1. GET /api/tabs
+	e := echo.New()
+	reqTabs := httptest.NewRequest(http.MethodGet, "/api/tabs", nil)
+	recTabs := httptest.NewRecorder()
+	cTabs := e.NewContext(reqTabs, recTabs)
+	if err := getTabsHandler(cTabs); err != nil {
+		t.Fatalf("getTabsHandler failed: %v", err)
+	}
+	var tabs []string
+	if err := json.Unmarshal(recTabs.Body.Bytes(), &tabs); err != nil {
+		t.Fatalf("failed to unmarshal tabs: %v", err)
+	}
+	if len(tabs) != 2 || tabs[0] != "tabA" || tabs[1] != "tabB" {
+		t.Errorf("unexpected tabs returned: %+v", tabs)
+	}
+
+	// 2. GET /api/hostlist
+	reqHosts := httptest.NewRequest(http.MethodGet, "/api/hostlist", nil)
+	recHosts := httptest.NewRecorder()
+	cHosts := e.NewContext(reqHosts, recHosts)
+	if err := getHostList(cHosts); err != nil {
+		t.Fatalf("getHostList failed: %v", err)
+	}
+	var hosts []models.Host
+	if err := json.Unmarshal(recHosts.Body.Bytes(), &hosts); err != nil {
+		t.Fatalf("failed to unmarshal hosts: %v", err)
+	}
+	if len(hosts) != 2 {
+		t.Fatalf("expected 2 merged hosts, got %d", len(hosts))
+	}
+	if hosts[0].Tab != "tabA" || hosts[0].Hostname != "host-a" {
+		t.Errorf("unexpected host 0: %+v", hosts[0])
+	}
+	if hosts[1].Tab != "tabB" || hosts[1].Hostname != "host-b" {
+		t.Errorf("unexpected host 1: %+v", hosts[1])
+	}
+}
+
+func TestTabArchive_RoutesExportImport(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalDataDir := db.GetDataDir()
+	defer func() {
+		db.SetDataDir(originalDataDir)
+	}()
+	db.SetDataDir(tmpDir)
+
+	tabName := "test_tab"
+	tabDir := filepath.Join(tmpDir, tabName)
+	_ = os.MkdirAll(tabDir, 0755)
+	_ = os.WriteFile(filepath.Join(tabDir, "hostlist.toml"), []byte("[[host]]\nhostname = 'srv-test'\nip = '10.0.0.99'\nplatform = 'Linux'\n"), 0644)
+	_ = os.WriteFile(filepath.Join(tabDir, "hostcredentials.toml"), []byte("[[host]]\nhostname = 'srv-test'\n[[host.userlist]]\nusername = 'root'\npassword = 'secret'\n"), 0644)
+
+	_ = db.WriteTabConfig([]models.TabItem{
+		{
+			Name:         tabName,
+			DirPath:      "./" + tabName,
+			ListFilename: "hostlist.toml",
+			CredFilename: "hostcredentials.toml",
+		},
+	})
+
+	e := echo.New()
+
+	// 1. Export tab archive
+	reqExport := httptest.NewRequest(http.MethodGet, "/api/tabs/"+tabName+"/export", nil)
+	recExport := httptest.NewRecorder()
+	cExport := e.NewContext(reqExport, recExport)
+	cExport.SetParamNames("name")
+	cExport.SetParamValues(tabName)
+
+	if err := exportTabArchiveHandler(cExport); err != nil {
+		t.Fatalf("exportTabArchiveHandler failed: %v", err)
+	}
+	if recExport.Code != http.StatusOK {
+		t.Fatalf("expected 200 from export, got %d: %s", recExport.Code, recExport.Body.String())
+	}
+	archiveBytes := recExport.Body.Bytes()
+	if len(archiveBytes) == 0 {
+		t.Fatalf("empty archive returned")
+	}
+
+	// 2. Test Import with conflict (overwrite = false)
+	bodyBuf := new(bytes.Buffer)
+	mpWriter := multipart.NewWriter(bodyBuf)
+	part, err := mpWriter.CreateFormFile("file", tabName+".tgz")
+	if err != nil {
+		t.Fatalf("CreateFormFile failed: %v", err)
+	}
+	_, _ = part.Write(archiveBytes)
+	mpWriter.Close()
+
+	reqImportConflict := httptest.NewRequest(http.MethodPost, "/api/tabs/import", bodyBuf)
+	reqImportConflict.Header.Set("Content-Type", mpWriter.FormDataContentType())
+	recImportConflict := httptest.NewRecorder()
+	cImportConflict := e.NewContext(reqImportConflict, recImportConflict)
+
+	if err := importTabArchiveHandler(cImportConflict); err != nil {
+		t.Fatalf("importTabArchiveHandler returned error: %v", err)
+	}
+	if recImportConflict.Code != http.StatusConflict {
+		t.Fatalf("expected 409 conflict, got %d: %s", recImportConflict.Code, recImportConflict.Body.String())
+	}
+
+	// 3. Test Import with overwrite = true
+	bodyBuf2 := new(bytes.Buffer)
+	mpWriter2 := multipart.NewWriter(bodyBuf2)
+	part2, err := mpWriter2.CreateFormFile("file", tabName+".tgz")
+	if err != nil {
+		t.Fatalf("CreateFormFile failed: %v", err)
+	}
+	_, _ = part2.Write(archiveBytes)
+	mpWriter2.Close()
+
+	reqImportOverwrite := httptest.NewRequest(http.MethodPost, "/api/tabs/import?overwrite=true", bodyBuf2)
+	reqImportOverwrite.Header.Set("Content-Type", mpWriter2.FormDataContentType())
+	recImportOverwrite := httptest.NewRecorder()
+	cImportOverwrite := e.NewContext(reqImportOverwrite, recImportOverwrite)
+
+	if err := importTabArchiveHandler(cImportOverwrite); err != nil {
+		t.Fatalf("importTabArchiveHandler failed: %v", err)
+	}
+	if recImportOverwrite.Code != http.StatusOK {
+		t.Fatalf("expected 200 ok for overwrite, got %d: %s", recImportOverwrite.Code, recImportOverwrite.Body.String())
+	}
+}
+
+func TestDeleteHost(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "hcm_test_del_routes_*")
+	if err != nil {
+		t.Fatalf("MkdirTemp failed: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	origDir := db.GetDataDir()
+	defer db.SetDataDir(origDir)
+
+	filepath.Walk(origDir, func(path string, info os.FileInfo, err error) error {
+		rel, _ := filepath.Rel(origDir, path)
+		if rel == "." {
+			return nil
+		}
+		target := filepath.Join(tmpDir, rel)
+		if info.IsDir() {
+			return os.MkdirAll(target, 0755)
+		}
+		data, _ := os.ReadFile(path)
+		return os.WriteFile(target, data, 0644)
+	})
+
+	db.SetDataDir(tmpDir)
+
+	e := echo.New()
+	hosts, err := db.ReadHostList()
+	if err != nil {
+		t.Fatalf("ReadHostList failed: %v", err)
+	}
+	if len(hosts) == 0 {
+		t.Skip("No hosts to delete")
+	}
+
+	// 1. Delete by ID
+	target := hosts[0]
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/hostlist/%s?hostname=%s&tab=%s", target.ID, target.Hostname, target.Tab), nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(target.ID)
+
+	if err := deleteHost(c); err != nil {
+		t.Fatalf("deleteHost returned error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// 2. Delete with stale ID but fallback query params
+	lastTarget := hosts[len(hosts)-1]
+	reqStale := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/hostlist/invalid_id?hostname=%s&tab=%s", lastTarget.Hostname, lastTarget.Tab), nil)
+	recStale := httptest.NewRecorder()
+	cStale := e.NewContext(reqStale, recStale)
+	cStale.SetParamNames("id")
+	cStale.SetParamValues("invalid_id")
+
+	if err := deleteHost(cStale); err != nil {
+		t.Fatalf("deleteHost with fallback returned error: %v", err)
+	}
+	if recStale.Code != http.StatusOK {
+		t.Fatalf("expected 200 with fallback, got %d: %s", recStale.Code, recStale.Body.String())
+	}
+
+	// 3. Create host and delete
+	createBody := []byte(fmt.Sprintf(`{"hostname":"test-temp-del.local","platform":"Linux","tab":"%s"}`, lastTarget.Tab))
+	reqCreate := httptest.NewRequest(http.MethodPost, "/api/hostlist", bytes.NewReader(createBody))
+	reqCreate.Header.Set("Content-Type", "application/json")
+	recCreate := httptest.NewRecorder()
+	cCreate := e.NewContext(reqCreate, recCreate)
+
+	if err := createHost(cCreate); err != nil {
+		t.Fatalf("createHost failed: %v", err)
+	}
+	if recCreate.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", recCreate.Code, recCreate.Body.String())
+	}
+
+	var created models.Host
+	if err := json.Unmarshal(recCreate.Body.Bytes(), &created); err != nil {
+		t.Fatalf("failed to unmarshal created host: %v", err)
+	}
+
+	reqDelCreated := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/hostlist/%s?hostname=%s&tab=%s", created.ID, created.Hostname, created.Tab), nil)
+	recDelCreated := httptest.NewRecorder()
+	cDelCreated := e.NewContext(reqDelCreated, recDelCreated)
+	cDelCreated.SetParamNames("id")
+	cDelCreated.SetParamValues(created.ID)
+
+	if err := deleteHost(cDelCreated); err != nil {
+		t.Fatalf("deleteHost created host failed: %v", err)
+	}
+	if recDelCreated.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", recDelCreated.Code, recDelCreated.Body.String())
+	}
+}
+
+
 

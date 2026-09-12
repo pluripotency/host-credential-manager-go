@@ -26,6 +26,10 @@ export default function ManagerApp() {
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   
+  // Multi-tab states
+  const [availableTabs, setAvailableTabs] = useState<string[]>([]);
+  const [selectedTabs, setSelectedTabs] = useState<string[]>([]);
+  
   // Table state
   const [sortColumn, setSortColumn] = useState<keyof HostList>("hostname");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -38,8 +42,11 @@ export default function ManagerApp() {
   const [formMode, setFormMode] = useState<"closed" | "add" | "edit">("closed");
   const [editingHost, setEditingHost] = useState<HostList | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Tab Archive Import & Conflict Modal states
   const [isImportOpen, setIsImportOpen] = useState(false);
-  const [importMergeOption, setImportMergeOption] = useState<"merge" | "overwrite">("merge");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [overwriteConfirm, setOverwriteConfirm] = useState<{ name: string; dirpath: string } | null>(null);
   
   // UI Utilities
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -47,14 +54,32 @@ export default function ManagerApp() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch all hosts
+  // Fetch all hosts and tabs
   const fetchHostList = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/hostlist");
-      if (!res.ok) throw new Error("Failed to load host database");
-      const data = await res.json();
+      const [hostRes, tabsRes] = await Promise.all([
+        fetch("/api/hostlist"),
+        fetch("/api/tabs").catch(() => null),
+      ]);
+      if (!hostRes.ok) throw new Error("Failed to load host database");
+      const data = await hostRes.json();
       setHostList(data);
+
+      if (tabsRes && tabsRes.ok) {
+        const tabsData: string[] = await tabsRes.json();
+        if (Array.isArray(tabsData) && tabsData.length > 0) {
+          setAvailableTabs(tabsData);
+          setSelectedTabs((prev) => {
+            if (prev.length === 0) return tabsData;
+            const valid = prev.filter((t) => tabsData.includes(t));
+            return valid.length > 0 ? valid : tabsData;
+          });
+        } else {
+          setAvailableTabs([]);
+          setSelectedTabs([]);
+        }
+      }
     } catch (err) {
       addToast("Failed to connect to backend server", "error");
     } finally {
@@ -131,14 +156,26 @@ export default function ManagerApp() {
   // Delete Host
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/hostlist/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
+      const targetHost = hostList.find((h) => h.id === id);
+      const queryParams = new URLSearchParams();
+      if (targetHost) {
+        if (targetHost.hostname) queryParams.set("hostname", targetHost.hostname);
+        if (targetHost.tab) queryParams.set("tab", targetHost.tab);
+      }
+      const qs = queryParams.toString();
+      const url = `/api/hostlist/${encodeURIComponent(id)}${qs ? `?${qs}` : ""}`;
+      const res = await fetch(url, { method: "DELETE" });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Delete failed");
+      }
       
-      setHostList((prev) => prev.filter((h) => h.id !== id));
       addToast("Host successfully deleted", "success");
       setDeletingId(null);
-    } catch (err) {
-      addToast("Failed to delete host", "error");
+      await fetchHostList();
+    } catch (err: any) {
+      addToast(err.message || "Failed to delete host", "error");
+      setDeletingId(null);
     }
   };
 
@@ -156,88 +193,110 @@ export default function ManagerApp() {
       });
 
       if (!res.ok) {
-        const errData = await res.json();
+        const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || "Save failed");
       }
 
-      const savedHost = await res.json();
-      
       if (isEdit) {
-        setHostList((prev) => prev.map((h) => (h.id === savedHost.id ? savedHost : h)));
         addToast("Host updated successfully", "success");
       } else {
-        setHostList((prev) => [savedHost, ...prev]);
         addToast("New host added successfully", "success");
       }
 
       setFormMode("closed");
       setEditingHost(null);
+      await fetchHostList();
     } catch (err: any) {
       addToast(err.message || "Failed to save host", "error");
     }
   };
 
-  // Trigger file dialog
-  const triggerImport = () => {
-    fileInputRef.current?.click();
-  };
-
-  // Handle CSV upload
-  const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle Tab Archive Import
+  const handleTabFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      const text = evt.target?.result;
-      if (typeof text !== "string") return;
-
-      // Parse with PapaParse client side first for client validations
-      import("papaparse").then((Papa) => {
-        const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-        if (parsed.errors.length > 0) {
-          addToast("Error parsing CSV file locally", "error");
-          return;
-        }
-
-        const data = parsed.data as any[];
-        // Verify we have at least hostname and platform
-        const hasRequired = data.every(row => row.hostname && row.platform);
-        if (!hasRequired && data.length > 0) {
-          if (!confirm("Some rows appear to be missing critical fields (hostname, platform). Do you want to try importing anyway?")) {
-            return;
-          }
-        }
-
-        // Post to backend import endpoint
-        fetch("/api/hostlist/import", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            data,
-            merge: importMergeOption === "merge"
-          })
-        })
-        .then(res => {
-          if (!res.ok) throw new Error("Import failed on server");
-          return res.json();
-        })
-        .then(resData => {
-          addToast(`Successfully imported ${resData.count} hosts!`, "success");
-          setIsImportOpen(false);
-          fetchHostList();
-        })
-        .catch(() => {
-          addToast("Failed to upload CSV to server", "error");
-        });
-      });
-    };
-    reader.readAsText(file);
-    e.target.value = ""; // clear file input
+    if (file) {
+      setImportFile(file);
+      setOverwriteConfirm(null);
+      executeTabImport(file, false);
+    }
+    e.target.value = "";
   };
 
-  // HostList filtered ONLY by selectedCategory (used to gather available tags for this category)
+  const executeTabImport = async (fileToUpload: File, overwrite: boolean) => {
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+      const url = `/api/tabs/import${overwrite ? "?overwrite=true" : ""}`;
+      const res = await fetch(url, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.status === 409) {
+        const data = await res.json();
+        setOverwriteConfirm({
+          name: data.name || fileToUpload.name.replace(/\.t(ar\.)?gz$/, ""),
+          dirpath: data.dirpath || `./${data.name}`,
+        });
+        setImporting(false);
+        return;
+      }
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Import failed on server");
+      }
+
+      const result = await res.json();
+      addToast(`Tab "${result.tab?.name || "archive"}" imported successfully!`, "success");
+      setIsImportOpen(false);
+      setImportFile(null);
+      setOverwriteConfirm(null);
+      await fetchHostList();
+    } catch (err: any) {
+      addToast(err.message || "Failed to import tab archive", "error");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleOverwriteYes = () => {
+    if (importFile) {
+      executeTabImport(importFile, true);
+    }
+  };
+
+  const handleOverwriteNo = () => {
+    setOverwriteConfirm(null);
+    setImportFile(null);
+    setIsImportOpen(false);
+    addToast("Import cancelled. Existing tab was not overwritten.", "info");
+  };
+
+  // Tab selection helpers
+  const toggleTab = (tabName: string) => {
+    setSelectedTabs((prev) =>
+      prev.includes(tabName) ? prev.filter((t) => t !== tabName) : [...prev, tabName]
+    );
+  };
+
+  const selectAllTabs = () => {
+    setSelectedTabs(availableTabs);
+  };
+
+  const deselectAllTabs = () => {
+    setSelectedTabs([]);
+  };
+
+  // HostList filtered ONLY by selectedCategory and selected tabs (used to gather available tags for this category)
   const categoryFilteredHostList = hostList.filter((h) => {
+    // Filter by selected tabs
+    if (availableTabs.length > 0) {
+      if (selectedTabs.length === 0) return false;
+      if (h.tab && !selectedTabs.includes(h.tab)) return false;
+    }
+
     if (selectedCategory !== "All") {
       const category = CATEGORIES.find((cat) => cat.name === selectedCategory);
       if (category) {
@@ -259,6 +318,12 @@ export default function ManagerApp() {
 
   // Dynamic filter lists
   const filteredHostList = hostList.filter((h) => {
+    // 0. Filter by selected tabs
+    if (availableTabs.length > 0) {
+      if (selectedTabs.length === 0) return false;
+      if (h.tab && !selectedTabs.includes(h.tab)) return false;
+    }
+
     // 1. Filter by category
     if (selectedCategory !== "All") {
       const category = CATEGORIES.find((cat) => cat.name === selectedCategory);
@@ -334,7 +399,15 @@ export default function ManagerApp() {
   // Helper to count hosts matching a category's rule dynamically
   const getCategoryCount = (name: string) => {
     const cat = CATEGORIES.find((c) => c.name === name);
-    return cat ? hostList.filter(cat.match).length : 0;
+    return cat
+      ? hostList.filter((h) => {
+          if (availableTabs.length > 0) {
+            if (selectedTabs.length === 0) return false;
+            if (h.tab && !selectedTabs.includes(h.tab)) return false;
+          }
+          return cat.match(h);
+        }).length
+      : 0;
   };
 
   return (
@@ -436,26 +509,32 @@ export default function ManagerApp() {
               <span>hcm-client.tgz</span>
             </a>
 
-            {/* Import Button */}
-            {role === "admin" && (
+            {/* Import Tab Button: ONLY displayed when exactly one tab is selected */}
+            {role === "admin" && selectedTabs.length === 1 && (
               <button
-                onClick={() => setIsImportOpen(true)}
+                onClick={() => {
+                  setImportFile(null);
+                  setOverwriteConfirm(null);
+                  setIsImportOpen(true);
+                }}
                 className="p-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-600 hover:text-slate-800 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+                title="Import tab package (.tgz)"
               >
                 <Upload className="w-3.5 h-3.5 text-slate-500" />
                 <span>Import</span>
               </button>
             )}
 
-            {/* Export Button */}
-            {role === "admin" && (
+            {/* Export Tab Button: ONLY displayed when exactly one tab is selected */}
+            {role === "admin" && selectedTabs.length === 1 && (
               <a
-                href="/api/hostlist/export"
-                download
+                href={`/api/tabs/${encodeURIComponent(selectedTabs[0])}/export`}
+                download={`${selectedTabs[0]}.tgz`}
                 className="p-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-600 hover:text-slate-800 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+                title={`Export tab "${selectedTabs[0]}" as ${selectedTabs[0]}.tgz`}
               >
-                <Download className="w-3.5 h-3.5 text-slate-500" />
-                <span>Export CSV</span>
+                <Download className="w-3.5 h-3.5 text-blue-600" />
+                <span>Export ({selectedTabs[0]})</span>
               </a>
             )}
 
@@ -558,25 +637,89 @@ export default function ManagerApp() {
 
           {/* Filtering, Search & Settings Control Panel */}
           <section className="bg-white border-y border-slate-200 px-4 py-2.5 flex flex-col md:flex-row items-center justify-between gap-3 shrink-0">
-            {/* Search inputs */}
-            <div className="relative w-full md:max-w-md">
-              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
-                <Search className="w-4 h-4" />
+            {/* Search input & Tab filters */}
+            <div className="flex flex-col w-full md:max-w-xl gap-2">
+              <div className="relative w-full">
+                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+                  <Search className="w-4 h-4" />
+                </div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search hostname, IP, username, tags..."
+                  className="w-full text-xs pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-mono"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute inset-y-0 right-2.5 flex items-center text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search hostname, IP, username, tags..."
-                className="w-full text-xs pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-mono"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute inset-y-0 right-2.5 flex items-center text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+
+              {/* Tabs below Search Box (Checkbox-list toggle behavior, default all selected, merged) */}
+              {availableTabs.length > 0 && (
+                <div className="flex items-center flex-wrap gap-1.5 pt-0.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">
+                    Tabs:
+                  </span>
+                  {availableTabs.map((tab) => {
+                    const isSelected = selectedTabs.includes(tab);
+                    const tabHostCount = hostList.filter((h) => h.tab === tab).length;
+                    return (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => toggleTab(tab)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer select-none ${
+                          isSelected
+                            ? "bg-blue-50 text-blue-800 border-blue-300 shadow-xs"
+                            : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100 hover:text-slate-700"
+                        }`}
+                        title={isSelected ? `Click to deselect ${tab}` : `Click to select ${tab}`}
+                      >
+                        <span
+                          className={`w-3.5 h-3.5 rounded flex items-center justify-center border text-[10px] ${
+                            isSelected
+                              ? "bg-blue-600 border-blue-600 text-white"
+                              : "bg-white border-slate-300"
+                          }`}
+                        >
+                          {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                        </span>
+                        <span className="font-mono">{tab}</span>
+                        <span
+                          className={`text-[10px] px-1 rounded-full font-mono ${
+                            isSelected ? "bg-blue-200/60 text-blue-900" : "bg-slate-200 text-slate-500"
+                          }`}
+                        >
+                          {tabHostCount}
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  <div className="flex items-center gap-1 ml-1 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={selectAllTabs}
+                      className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
+                    >
+                      All
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={deselectAllTabs}
+                      className="text-slate-500 hover:text-slate-700 hover:underline cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -797,16 +940,26 @@ export default function ManagerApp() {
                         {/* Hostname Column */}
                         <td className={`${rowPadding} font-mono font-medium text-slate-900 group/host relative`}>
                           <div className="flex items-center justify-between gap-1.5 pr-2">
-                            <span 
-                              title={h.hostname}
-                              className="truncate select-all cursor-pointer hover:text-blue-600 transition-colors"
-                              onClick={() => handleCopyToClipboard(h.hostname, `${h.id}-hostname`, "Hostname")}
-                            >
-                              {h.hostname}
-                            </span>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {availableTabs.length > 0 && h.tab && (
+                                <span
+                                  title={`Tab: ${h.tab}`}
+                                  className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 shrink-0 font-sans font-semibold tracking-wide"
+                                >
+                                  {h.tab}
+                                </span>
+                              )}
+                              <span 
+                                title={h.hostname}
+                                className="truncate select-all cursor-pointer hover:text-blue-600 transition-colors"
+                                onClick={() => handleCopyToClipboard(h.hostname, `${h.id}-hostname`, "Hostname")}
+                              >
+                                {h.hostname}
+                              </span>
+                            </div>
                             <button
                               onClick={() => handleCopyToClipboard(h.hostname, `${h.id}-hostname`, "Hostname")}
-                              className="opacity-0 group-hover/host:opacity-100 p-0.5 hover:bg-slate-200 text-slate-400 hover:text-slate-700 rounded transition-opacity"
+                              className="opacity-0 group-hover/host:opacity-100 p-0.5 hover:bg-slate-200 text-slate-400 hover:text-slate-700 rounded transition-opacity shrink-0"
                               title="Copy Hostname"
                             >
                               {isCopiedHostname ? (
@@ -1056,8 +1209,11 @@ export default function ManagerApp() {
                                 <Edit2 className="w-3 h-3" />
                               </button>
                               <button
-                                onClick={() => setDeletingId(h.id)}
-                                className="p-1 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-transparent hover:border-rose-200 rounded-md transition-all"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingId(h.id);
+                                }}
+                                className="p-1 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-transparent hover:border-rose-200 rounded-md transition-all cursor-pointer"
                                 title="Delete Host"
                               >
                                 <Trash2 className="w-3 h-3" />
@@ -1081,6 +1237,7 @@ export default function ManagerApp() {
           <div className="flex-1" onClick={() => setFormMode("closed")}></div>
           <CredentialForm
             credential={formMode === "edit" ? editingHost : null}
+            tabs={availableTabs}
             onSave={handleSave}
             onCancel={() => {
               setFormMode("closed");
@@ -1100,19 +1257,24 @@ export default function ManagerApp() {
               </div>
               <h3 className="font-bold text-sm text-slate-800">Confirm Deletion</h3>
             </div>
-            <p className="text-xs text-slate-500 leading-relaxed mb-4">
-              Are you absolutely sure you want to delete this host? This action writes immediately back to the local database files and is irreversible.
+            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+              Are you absolutely sure you want to delete{" "}
+              <strong className="font-mono font-bold text-rose-700">
+                {hostList.find((h) => h.id === deletingId)?.hostname || "this host"}
+              </strong>
+              {hostList.find((h) => h.id === deletingId)?.tab ? ` (Tab: ${hostList.find((h) => h.id === deletingId)?.tab})` : ""}?
+              This action writes immediately back to the local database files and is irreversible.
             </p>
             <div className="flex justify-end gap-2 text-xs">
               <button
                 onClick={() => setDeletingId(null)}
-                className="px-3.5 py-1.5 font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                className="px-3.5 py-1.5 font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
-                onClick={() => handleDelete(deletingId)}
-                className="px-4 py-1.5 font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm transition-all"
+                onClick={() => deletingId && handleDelete(deletingId)}
+                className="px-4 py-1.5 font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm transition-all cursor-pointer"
               >
                 Confirm Delete
               </button>
@@ -1121,92 +1283,158 @@ export default function ManagerApp() {
         </div>
       )}
 
-      {/* Import CSV Modal Dialog */}
+      {/* Import Tab Package (.tgz) Modal Dialog */}
       {isImportOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 border border-slate-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <div className="flex items-center gap-2 text-slate-800">
-                <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
-                  <Upload className="w-4 h-4" />
+                <div className={`p-1.5 rounded-lg ${overwriteConfirm ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-blue-600"}`}>
+                  {overwriteConfirm ? <AlertCircle className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
                 </div>
-                <h3 className="font-bold text-sm">Bulk Import from CSV</h3>
+                <h3 className="font-bold text-sm">
+                  {overwriteConfirm ? "タブ上書きの確認 (Confirm Tab Overwrite)" : "Import Tab Package (.tgz)"}
+                </h3>
               </div>
               <button
-                onClick={() => setIsImportOpen(false)}
-                className="p-1 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600"
+                onClick={() => {
+                  setIsImportOpen(false);
+                  setImportFile(null);
+                  setOverwriteConfirm(null);
+                }}
+                className="p-1 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-4 text-xs">
-              <p className="text-slate-500 leading-relaxed">
-                Choose a `.csv` file with headers matching the Host List schema (without credentials): 
-                <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-[10px] ml-1">
-                  hostname, ip, platform, os, port, tags, description
-                </code>
-              </p>
-
-              {/* Import Options */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
-                <span className="font-bold text-slate-600 block text-[10px] uppercase tracking-wider">
-                  Import Conflict Resolution:
-                </span>
-                <label className="flex items-start gap-2.5 cursor-pointer text-slate-700 hover:text-slate-900">
-                  <input
-                    type="radio"
-                    name="importOption"
-                    checked={importMergeOption === "merge"}
-                    onChange={() => setImportMergeOption("merge")}
-                    className="mt-0.5 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
-                  />
-                  <div>
-                    <span className="font-bold block">Merge and Update (Recommended)</span>
-                    <span className="text-[10px] text-slate-400">Updates existing hosts if they match on hostname, leaving other servers untouched.</span>
+            {overwriteConfirm ? (
+              /* Overwrite Confirmation Alert */
+              <div className="space-y-4 text-xs">
+                <div className="p-4 bg-amber-50 border border-amber-300 rounded-xl space-y-2.5">
+                  <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
+                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                    <span>タブ上書きの確認</span>
                   </div>
-                </label>
-
-                <label className="flex items-start gap-2.5 cursor-pointer text-slate-700 hover:text-slate-900 mt-2">
-                  <input
-                    type="radio"
-                    name="importOption"
-                    checked={importMergeOption === "overwrite"}
-                    onChange={() => setImportMergeOption("overwrite")}
-                    className="mt-0.5 text-rose-600 focus:ring-rose-500 w-3.5 h-3.5"
-                  />
-                  <div>
-                    <span className="font-bold text-rose-700 block">Overwrite Database</span>
-                    <span className="text-[10px] text-slate-400">Completely replaces current CSV database with the uploaded file data. Use with caution.</span>
+                  <p className="text-amber-900 leading-relaxed text-xs">
+                    展開したディレクトリ名「<strong className="font-bold font-mono text-amber-950 underline">{overwriteConfirm.name}</strong>」は <code className="font-mono bg-amber-100 px-1 py-0.5 rounded text-amber-900">tab_config.toml</code> の tab.name に既に存在します。
+                  </p>
+                  <p className="text-amber-950 font-semibold text-xs pt-0.5">
+                    上書きしますか？
+                  </p>
+                  <div className="bg-white/90 p-2.5 rounded-lg border border-amber-200 text-[11px] text-slate-600 space-y-0.5 font-mono">
+                    <div><span className="text-slate-500 font-sans">Tab Name: </span><span className="font-semibold text-slate-800">{overwriteConfirm.name}</span></div>
+                    <div><span className="text-slate-500 font-sans">Target Dir: </span><span className="text-slate-800">{overwriteConfirm.dirpath}</span></div>
                   </div>
-                </label>
-              </div>
+                </div>
 
-              {/* Hidden file input */}
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleCSVUpload}
-                accept=".csv"
-                className="hidden"
-              />
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  onClick={() => setIsImportOpen(false)}
-                  className="px-3.5 py-1.5 font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={triggerImport}
-                  className="px-4 py-1.5 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-all flex items-center gap-1.5"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  Select CSV File & Execute
-                </button>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    onClick={handleOverwriteNo}
+                    disabled={importing}
+                    className="px-4 py-2 font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer text-xs"
+                  >
+                    No (上書きしない)
+                  </button>
+                  <button
+                    onClick={handleOverwriteYes}
+                    disabled={importing}
+                    className="px-4 py-2 font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer text-xs"
+                  >
+                    {importing ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>上書き中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Yes (上書きする)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              /* File Selection Form */
+              <div className="space-y-4 text-xs">
+                <p className="text-slate-500 leading-relaxed">
+                  Upload an exported tab package (<code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-[10px]">.tgz</code> or <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-[10px]">.tar.gz</code>).
+                  The archive folder will be set as the tab name and directory path (<code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-[10px]">./[name]</code>).
+                </p>
+
+                {/* File Drop / Select Area */}
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) {
+                      setImportFile(file);
+                      setOverwriteConfirm(null);
+                      executeTabImport(file, false);
+                    }
+                  }}
+                  className="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-6 text-center cursor-pointer bg-slate-50/50 hover:bg-blue-50/20 transition-all"
+                >
+                  <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                  {importFile ? (
+                    <div>
+                      <p className="font-semibold text-slate-800 font-mono text-xs">{importFile.name}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{(importFile.size / 1024).toFixed(1)} KB</p>
+                      <span className="text-[10px] text-blue-600 underline mt-1 inline-block">Click to choose a different file</span>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="font-semibold text-slate-700">Click to browse or choose .tgz file</p>
+                      <p className="text-[10px] text-slate-400 mt-1">Accepts .tgz and .tar.gz tab packages</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Hidden file input */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleTabFileSelect}
+                  accept=".tgz,.tar.gz,application/gzip,application/x-gzip"
+                  className="hidden"
+                />
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => {
+                      setIsImportOpen(false);
+                      setImportFile(null);
+                      setOverwriteConfirm(null);
+                    }}
+                    disabled={importing}
+                    className="px-3.5 py-1.5 font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => importFile && executeTabImport(importFile, false)}
+                    disabled={!importFile || importing}
+                    className="px-4 py-1.5 font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {importing ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Importing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Import Tab</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

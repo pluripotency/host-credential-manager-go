@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -27,6 +28,7 @@ import (
 )
 
 type CreateHostRequest struct {
+	Tab         string                  `json:"tab"`
 	Hostname    string                  `json:"hostname"`
 	IP          string                  `json:"ip"`
 	Platform    string                  `json:"platform"`
@@ -39,6 +41,7 @@ type CreateHostRequest struct {
 }
 
 type UpdateHostRequest struct {
+	Tab         *string                  `json:"tab"`
 	Hostname    *string                  `json:"hostname"`
 	IP          *string                  `json:"ip"`
 	Platform    *string                  `json:"platform"`
@@ -74,10 +77,12 @@ func RegisterRoutes(e *echo.Echo) {
 	api.GET("/hello", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"message": "Hello from Go!"})
 	})
+	api.GET("/tabs", getTabsHandler)
 
 	// Auth routes
 	adminOrUserGroup := api.Group("", RequireAuth("admin", "user"))
 	adminOrUserGroup.GET("/hostlist", getHostList)
+	adminOrUserGroup.GET("/tabs", getTabsHandler)
 	adminOrUserGroup.GET("/password/generate", generatePasswordHandler)
 	adminOrUserGroup.GET("/client/download", downloadHcmClientHandler)
 
@@ -87,6 +92,84 @@ func RegisterRoutes(e *echo.Echo) {
 	adminOnlyGroup.DELETE("/hostlist/:id", deleteHost)
 	adminOnlyGroup.POST("/hostlist/import", importHosts)
 	adminOnlyGroup.GET("/hostlist/export", exportHosts)
+	adminOnlyGroup.GET("/tabs/:name/export", exportTabArchiveHandler)
+	adminOnlyGroup.GET("/tabs/export", exportTabArchiveHandler)
+	adminOnlyGroup.POST("/tabs/import", importTabArchiveHandler)
+}
+
+func exportTabArchiveHandler(c echo.Context) error {
+	name := c.Param("name")
+	if name == "" {
+		name = c.QueryParam("name")
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Tab name is required"})
+	}
+
+	var buf bytes.Buffer
+	if err := db.ExportTabArchive(name, &buf); err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+	}
+
+	c.Response().Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.tgz\"", name))
+	c.Response().Header().Set("Content-Type", "application/gzip")
+	return c.Blob(http.StatusOK, "application/gzip", buf.Bytes())
+}
+
+func importTabArchiveHandler(c echo.Context) error {
+	file, err := c.FormFile("file")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "No file uploaded (field 'file' required)"})
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Failed to read uploaded file"})
+	}
+	defer src.Close()
+
+	overwriteStr := c.QueryParam("overwrite")
+	if overwriteStr == "" {
+		overwriteStr = c.FormValue("overwrite")
+	}
+	overwrite := overwriteStr == "true" || overwriteStr == "1"
+
+	defaultName := strings.TrimSuffix(strings.TrimSuffix(file.Filename, ".tgz"), ".tar.gz")
+
+	tab, err := db.ImportTabArchive(src, defaultName, overwrite)
+	if err != nil {
+		var conflictErr *db.ErrTabConflict
+		if errors.As(err, &conflictErr) {
+			return c.JSON(http.StatusConflict, map[string]interface{}{
+				"conflict": true,
+				"name":     conflictErr.Name,
+				"dirpath":  conflictErr.DirPath,
+				"message":  fmt.Sprintf("Tab directory '%s' already exists. Overwrite?", conflictErr.DirPath),
+			})
+		}
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"success": true,
+		"tab":     tab,
+	})
+}
+
+func getTabsHandler(c echo.Context) error {
+	tabs, err := db.ReadTabConfig()
+	if err != nil {
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	if tabs == nil {
+		return c.JSON(http.StatusOK, []string{})
+	}
+	var names []string
+	for _, t := range tabs {
+		names = append(names, t.Name)
+	}
+	return c.JSON(http.StatusOK, names)
 }
 
 func getHostList(c echo.Context) error {
@@ -138,6 +221,7 @@ func createHost(c echo.Context) error {
 
 	newHost := models.Host{
 		ID:          newID,
+		Tab:         strings.TrimSpace(req.Tab),
 		Hostname:    req.Hostname,
 		IP:          strings.TrimSpace(req.IP),
 		Platform:    req.Platform,
@@ -195,6 +279,17 @@ func createHost(c echo.Context) error {
 	}
 
 	newHost.Userlist = formattedUserlist
+
+	if reReadHosts, err := db.ReadHostList(); err == nil {
+		for _, h := range reReadHosts {
+			if h.Hostname == newHost.Hostname && (newHost.Tab == "" || h.Tab == newHost.Tab) {
+				newHost.ID = h.ID
+				newHost.Tab = h.Tab
+				break
+			}
+		}
+	}
+
 	return c.JSON(http.StatusCreated, newHost)
 }
 
@@ -220,6 +315,36 @@ func updateHost(c echo.Context) error {
 	}
 
 	if index == -1 {
+		hostnameParam := strings.TrimSpace(c.QueryParam("hostname"))
+		tabParam := strings.TrimSpace(c.QueryParam("tab"))
+		if hostnameParam == "" && req.Hostname != nil {
+			hostnameParam = strings.TrimSpace(*req.Hostname)
+		}
+		if hostnameParam != "" {
+			for i, h := range hosts {
+				if h.Hostname == hostnameParam {
+					if tabParam == "" || h.Tab == tabParam {
+						index = i
+						break
+					}
+				}
+			}
+		}
+	}
+
+	if index == -1 && id != "" {
+		tabParam := strings.TrimSpace(c.QueryParam("tab"))
+		for i, h := range hosts {
+			if h.Hostname == id {
+				if tabParam == "" || h.Tab == tabParam {
+					index = i
+					break
+				}
+			}
+		}
+	}
+
+	if index == -1 {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "Host not found"})
 	}
 
@@ -231,6 +356,9 @@ func updateHost(c echo.Context) error {
 
 	if req.Hostname != nil {
 		hosts[index].Hostname = newHostname
+	}
+	if req.Tab != nil {
+		hosts[index].Tab = strings.TrimSpace(*req.Tab)
 	}
 	if req.IP != nil {
 		hosts[index].IP = strings.TrimSpace(*req.IP)
@@ -326,6 +454,8 @@ func updateHost(c echo.Context) error {
 
 func deleteHost(c echo.Context) error {
 	id := c.Param("id")
+	hostnameParam := strings.TrimSpace(c.QueryParam("hostname"))
+	tabParam := strings.TrimSpace(c.QueryParam("tab"))
 
 	hosts, err := db.ReadHostList()
 	if err != nil {
@@ -333,18 +463,55 @@ func deleteHost(c echo.Context) error {
 	}
 
 	var hostToDelete *models.Host
-	var filteredHosts []models.Host
-	for _, h := range hosts {
+	targetIndex := -1
+
+	// 1. Try matching by assigned ID
+	for i, h := range hosts {
 		if h.ID == id {
 			temp := h
 			hostToDelete = &temp
-		} else {
-			filteredHosts = append(filteredHosts, h)
+			targetIndex = i
+			break
+		}
+	}
+
+	// 2. If not matched by ID, try matching by query parameters (hostname and tab)
+	if hostToDelete == nil && hostnameParam != "" {
+		for i, h := range hosts {
+			if h.Hostname == hostnameParam {
+				if tabParam == "" || h.Tab == tabParam {
+					temp := h
+					hostToDelete = &temp
+					targetIndex = i
+					break
+				}
+			}
+		}
+	}
+
+	// 3. If still not matched, check if id param itself matches a hostname
+	if hostToDelete == nil && id != "" {
+		for i, h := range hosts {
+			if h.Hostname == id {
+				if tabParam == "" || h.Tab == tabParam {
+					temp := h
+					hostToDelete = &temp
+					targetIndex = i
+					break
+				}
+			}
 		}
 	}
 
 	if hostToDelete == nil {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "Host not found"})
+	}
+
+	var filteredHosts []models.Host
+	for i, h := range hosts {
+		if i != targetIndex {
+			filteredHosts = append(filteredHosts, h)
+		}
 	}
 
 	if err := db.WriteHostList(filteredHosts); err != nil {
@@ -356,9 +523,23 @@ func deleteHost(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
+	// Check if this hostname is still used by other hosts
+	hostnameStillExists := false
+	for _, h := range filteredHosts {
+		if h.Hostname == hostToDelete.Hostname {
+			hostnameStillExists = true
+			break
+		}
+	}
+
 	var filteredCreds []models.HostCredentials
 	for _, cr := range credentials {
-		if cr.Hostname != hostToDelete.Hostname {
+		if cr.Hostname == hostToDelete.Hostname {
+			// If the same hostname exists in another host/tab, preserve its credentials
+			if hostnameStillExists && hostToDelete.Tab != "" && cr.Tab != "" && cr.Tab != hostToDelete.Tab {
+				filteredCreds = append(filteredCreds, cr)
+			}
+		} else {
 			filteredCreds = append(filteredCreds, cr)
 		}
 	}
@@ -438,6 +619,7 @@ func importHosts(c echo.Context) error {
 
 		cleaned = append(cleaned, models.Host{
 			ID:          id,
+			Tab:         strings.TrimSpace(item.Tab),
 			Hostname:    hostname,
 			IP:          strings.TrimSpace(item.IP),
 			Platform:    platform,
@@ -746,12 +928,17 @@ func verifyToken(token string) (string, bool) {
 func RequireAuth(requiredRoles ...string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			cookie, err := c.Cookie("session_token")
-			if err != nil {
+			token := ""
+			if cookie, err := c.Cookie("session_token"); err == nil {
+				token = cookie.Value
+			} else if authHeader := c.Request().Header.Get("Authorization"); strings.HasPrefix(authHeader, "Bearer ") {
+				token = strings.TrimPrefix(authHeader, "Bearer ")
+			}
+			if token == "" {
 				return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized")
 			}
 
-			role, valid := verifyToken(cookie.Value)
+			role, valid := verifyToken(token)
 			if !valid {
 				return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized")
 			}

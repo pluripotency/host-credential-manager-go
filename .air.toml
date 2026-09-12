@@ -9,11 +9,11 @@ tmp_dir = "tmp"
   full_bin = "NODE_ENV=development ./tmp/main"
   
   # 監視するファイルの拡張子（Go関連ファイルのみに絞る）
-  include_ext = ["go", "tpl", "tmpl", "html", "toml"]
+  include_ext = ["go", "tpl", "tmpl", "html"]
   
-  # ★超重要：フロントエンドのディレクトリを完全に無視する
-  # ここを指定しないと、Viteの一時ファイル等に反応してGoが無限に再起動します
-  exclude_dir = ["assets", "tmp", "vendor", "testdata", "front"]
+  # ★超重要：フロントエンドおよび設定/データディレクトリを完全に無視する
+  # ここを指定しないと、Viteの一時ファイルやDB更新（TOML書き込み）に反応してGoが無限に再起動します
+  exclude_dir = ["assets", "tmp", "vendor", "testdata", "front", "config", "test_config"]
   
   # 監視から除外する特定のファイルパターン
   exclude_file = []

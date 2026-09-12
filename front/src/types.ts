@@ -11,6 +11,7 @@ export interface AccessItem {
 
 export interface HostList {
   id: string;
+  tab?: string;
   hostname: string;
   ip: string;
   platform: string;

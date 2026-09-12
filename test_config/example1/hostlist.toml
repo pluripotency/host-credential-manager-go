@@ -1,0 +1,70 @@
+[[host]]
+hostname = 'ssh-prod-web01.internal'
+ip = '10.0.2.14'
+platform = 'Linux'
+os = ''
+tags = 'production,web,frontend'
+description = 'Frontend web proxy running Nginx and Node.js proxy'
+updatedAt = '2026-06-20T10:30:00Z'
+
+[[host.accesslist]]
+protocol = 'http'
+port = '3000'
+path = '/app'
+
+[[host.accesslist]]
+protocol = 'https'
+port = '8080'
+path = '/admin'
+
+[[host.accesslist]]
+protocol = 'ssh'
+port = '10022'
+
+[[host]]
+hostname = 'db-mysql-master.cluster'
+ip = '10.0.4.5'
+platform = 'MySQL'
+os = ''
+tags = 'production,database,replica-set'
+description = 'Primary transactional database for user accounts'
+updatedAt = '2026-06-21T08:15:00Z'
+
+[[host.accesslist]]
+protocol = 'mysql'
+port = '3306'
+
+[[host]]
+hostname = 'ad-controller.corp.local'
+ip = '192.168.10.10'
+platform = 'Windows'
+os = ''
+tags = 'corp,active-directory,auth'
+description = 'Active Directory Domain Controller for office employees'
+updatedAt = '2026-06-19T14:20:00Z'
+
+[[host.accesslist]]
+protocol = 'ldap'
+port = '389'
+
+[[host.accesslist]]
+protocol = 'rdp'
+port = '3389'
+
+[[host]]
+hostname = 'router-core-border.net'
+ip = '172.16.1.1'
+platform = 'Cisco'
+os = ''
+tags = 'network,infrastructure,edge'
+description = 'Core border gateway router facing ISP upstream'
+updatedAt = '2026-06-22T11:05:00Z'
+
+[[host.accesslist]]
+protocol = 'ssh'
+port = '22'
+
+[[host.accesslist]]
+protocol = 'https'
+port = '443'
+

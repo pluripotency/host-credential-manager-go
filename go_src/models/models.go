@@ -7,12 +7,24 @@ type UserCredential struct {
 
 type HostCredentials struct {
 	Hostname string           `toml:"hostname" json:"hostname"`
+	Tab      string           `toml:"-" json:"tab,omitempty"`
 	Userlist []UserCredential `toml:"userlist" json:"userlist"`
 }
 
 // HostCredentialsList は TOML 全体を表すためのラップ用構造体です
 type HostCredentialsList struct {
 	Host []HostCredentials `toml:"host"`
+}
+
+type TabItem struct {
+	Name         string `toml:"name" json:"name"`
+	DirPath      string `toml:"dirpath" json:"dirpath"`
+	ListFilename string `toml:"list_filename" json:"list_filename"`
+	CredFilename string `toml:"cred_filename" json:"cred_filename"`
+}
+
+type TabConfig struct {
+	Tab []TabItem `toml:"tab" json:"tab"`
 }
 
 type AccessItem struct {
@@ -23,6 +35,7 @@ type AccessItem struct {
 
 type Host struct {
 	ID          string           `json:"id" csv:"-" toml:"-"`
+	Tab         string           `json:"tab,omitempty" csv:"tab,omitempty" toml:"tab,omitempty"`
 	Hostname    string           `json:"hostname" csv:"hostname" toml:"hostname"`
 	IP          string           `json:"ip" csv:"ip" toml:"ip"`
 	Platform    string           `json:"platform" csv:"platform" toml:"platform"`

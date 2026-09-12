@@ -10,6 +10,7 @@ interface UserCredential {
 
 interface CredentialFormProps {
   credential?: HostList | null;
+  tabs?: string[];
   onSave: (data: any) => void;
   onCancel: () => void;
 }
@@ -30,9 +31,10 @@ const PROTOCOL_OPTIONS = [
   { label: "Oracle", value: "oracle", defaultPort: "1521" },
 ];
 
-export default function CredentialForm({ credential, onSave, onCancel }: CredentialFormProps) {
+export default function CredentialForm({ credential, tabs, onSave, onCancel }: CredentialFormProps) {
   const isEdit = !!credential;
   
+  const [tab, setTab] = useState(credential?.tab || (tabs && tabs.length > 0 ? tabs[0] : ""));
   const [hostname, setHostname] = useState("");
   const [ip, setIp] = useState("");
   const [platform, setPlatform] = useState("Linux");
@@ -69,12 +71,14 @@ export default function CredentialForm({ credential, onSave, onCancel }: Credent
       } else {
         setUserlist([]);
       }
+      setTab(credential.tab || (tabs && tabs.length > 0 ? tabs[0] : ""));
     } else {
       resetForm();
     }
-  }, [credential]);
+  }, [credential, tabs]);
 
   const resetForm = () => {
+    setTab(tabs && tabs.length > 0 ? tabs[0] : "");
     setHostname("");
     setIp("");
     setPlatform("Linux");
@@ -137,6 +141,7 @@ export default function CredentialForm({ credential, onSave, onCancel }: Credent
 
     onSave({
       ...(credential?.id ? { id: credential.id } : {}),
+      tab: tab.trim(),
       hostname: hostname.trim(),
       ip: ip.trim(),
       platform,
@@ -182,6 +187,26 @@ export default function CredentialForm({ credential, onSave, onCancel }: Credent
 
       {/* Form Content */}
       <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Tab Selection if multiple tabs available */}
+        {tabs && tabs.length > 0 && (
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">
+              Tab / Group
+            </label>
+            <select
+              value={tab}
+              onChange={(e) => setTab(e.target.value)}
+              className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-mono"
+            >
+              {tabs.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Basic Identification Grid */}
         <div className="grid grid-cols-2 gap-3">
           <div>

@@ -1,4 +1,5 @@
 ## やりたいこと
+- ./test_config/にtab_config.tomlを作成しました。現在のconfigは消して一つだけだったhostlist.tomlを[[tab]]で指定して、frontのSearchボックスの下にタブを作成しタブごとに表示できるようにしてください。frontでtabをクリックしたときは、tabの切り替えではなく、checkboxlistのように選択・解除とし、Defaultでは全て選択されていて、すべてのhostlistをマージして表示してください。
 - hcm-clientは可能であればMutual TLSで認証したいです。host-credential-manager-goのcertを更新したら接続できないようにしたいです。hcm-client全てに個別のクライアント証明書を用意する必要はなく、やるとしても位置ユーザー分の証明書とCRLの運用で十分です。
 
 - ./hcm-client/README.mdを作成し、プログラムの役割、ビルド方法、詳細な使用方法を書いてください。

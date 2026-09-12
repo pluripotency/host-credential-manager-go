@@ -1,0 +1,11 @@
+[[tab]]
+name = 'example1'
+dirpath = './example1'
+list_filename = 'hostlist.toml'
+cred_filename = 'hostcredentials.toml'
+
+[[tab]]
+name = 'example2'
+dirpath = './example2'
+list_filename = 'hostlist.toml'
+cred_filename = 'hostcredentials.toml'
