@@ -36,7 +36,7 @@ rsync -av --delete --delete-excluded \
   --exclude="front/dist/" \
   --exclude="front/src/" \
   --exclude="front/public/" \
-  --exclude="data/" \
+  --exclude="config/" \
   --exclude="cert/" \
   --exclude="docker/" \
   --exclude="go_src/" \

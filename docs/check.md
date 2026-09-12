@@ -23,24 +23,24 @@
   - `README.md` にはログイン機能があることや RBAC（ロールベースアクセス制御）が記載されていたが、**「初期ユーザー名は何か」「初期パスワードは何か」が一切書かれていなかった**。
   - 初めてシステムを起動したユーザーがブラウザで `http://localhost:8080` を開いても、何を入力してログインすればよいか分からず利用を開始できない状態であった。
 - **実装の実態**:
-  - `data/config.toml` に初期設定が自動生成される：
+  - `config/config.toml` に初期設定が自動生成される：
     - `admin` ユーザー用パスワード: `admin_password = 'admin'`
     - `user` ユーザー用パスワード: `user_password = 'user'`
     - CLI・復号用マスターパスワード: `masterpassword = 'password'`
 - **対応結果・反映先**:
   - ✅ **対応完了**
   - **反映先**:
-    - [README.md](../README.md)「0. 初期ログイン情報とセットアップ時の注意事項」および「設定ファイル (`data/config.toml`)」
+    - [README.md](../README.md)「0. 初期ログイン情報とセットアップ時の注意事項」および「設定ファイル (`config/config.toml`)」
     - [docs/security_and_roles.md](security_and_roles.md)「1. 初期アカウントと初期設定」
   - **対応内容**:
     - 初回起動時の管理者（`admin` / `admin`）、一般ユーザー（`user` / `user`）、マスターパスワード（`password`）を明記。
-    - 初回起動後に `data/config.toml` を直接編集してパスワードを変更する手順、および変更後は HCM サーバーの再起動が必須であることを明記。
+    - 初回起動後に `config/config.toml` を直接編集してパスワードを変更する手順、および変更後は HCM サーバーの再起動が必須であることを明記。
 
 ---
 
 ### 1.2 IPアドレス制限（`permit_ip_list`）による外部遮断・初期締め出しリスク
 - **現状の課題**:
-  - `data/config.toml` に `permit_ip_list = ['127.0.0.1']` がデフォルトで設定されている。
+  - `config/config.toml` に `permit_ip_list = ['127.0.0.1']` がデフォルトで設定されている。
   - このため、リモートサーバー上で起動した場合や、LAN 内の別 PC からアクセスした場合、あるいは Docker コンテナ経由でアクセスした場合に、**いきなり `403 Forbidden` となり接続が遮断される**。
   - なぜ 403 になるのか、どの設定を変更すれば解除できるのかがドキュメントに説明されていなかった。
 - **実装上の仕様制限**:
@@ -96,10 +96,10 @@
 ### 2.1 「暗号化保管」表記と平文保存（TOML）の乖離
 - **現状の課題**:
   - ドキュメント上では「マスターパスワードで暗号化保管されたホスト個別パスワード」「復号された対象ノードのログインパスワードを取得」といった表現が使われていた。
-  - しかし実際のコード（`data/host_credentials.toml` および `data/config.toml`）では、**パスワード文字列がディスク上に平文（Plaintext）で保存されている**。
+  - しかし実際のコード（`config/host_credentials.toml` および `config/config.toml`）では、**パスワード文字列がディスク上に平文（Plaintext）で保存されている**。
 - **実装の実態**:
-  - `data/host_credentials.toml`: `password = 'v3ryS3cur3_web_prod_2026'`
-  - `data/config.toml`: `masterpassword = 'password'`
+  - `config/host_credentials.toml`: `password = 'v3ryS3cur3_web_prod_2026'`
+  - `config/config.toml`: `masterpassword = 'password'`
   - `sshFzfHandler`（`POST /api/ssh-fzf`）は、リクエストで送られた `masterpassword` が `config.toml` の `masterpassword` 文字列と一致しているかを比較しているのみで、暗号化ブロックの復号を行っているわけではない。
 - **対応結果・反映先**:
   - ✅ **対応完了**
@@ -109,7 +109,7 @@
     - [docs/security_and_roles.md](security_and_roles.md)「3. クレデンシャル管理とファイルセキュリティ」
   - **対応内容**:
     - ドキュメント内の「暗号化保管」「復号」という表現を「マスターパスワード照合による開示ゲート制御」に全面修正。
-    - 保存先がプレーンテキスト（TOML）であることを明記し、ファイルシステムのパーミッション設定（`chmod 600 data/*.toml`、`chmod 700 data`）および OS ディスク暗号化（LUKS / BitLocker）の適用を必須推奨事項として解説。
+    - 保存先がプレーンテキスト（TOML）であることを明記し、ファイルシステムのパーミッション設定（`chmod 600 config/*.toml`、`chmod 700 config`）および OS ディスク暗号化（LUKS / BitLocker）の適用を必須推奨事項として解説。
 
 ---
 
@@ -125,7 +125,7 @@
     - [docs/security_and_roles.md](security_and_roles.md)「3.2 マスターパスワードの変更手順と影響」
     - [README.md](../README.md)「0. 初期ログイン情報とセットアップ時の注意事項」
   - **対応内容**:
-    - マスターパスワード変更手順（`data/config.toml` の `masterpassword` 変更とサーバー再起動）を記載。
+    - マスターパスワード変更手順（`config/config.toml` の `masterpassword` 変更とサーバー再起動）を記載。
     - 既存データへの暗号学的破壊リスクはないが、利用中の全クライアントへの周知が必要である運用ルールを明記。
     - 設定キー名が `master_password` ではなく `masterpassword`（アンダースコアなし）である注意点も併せて強調。
 
@@ -155,7 +155,7 @@
 - **実装の実態**:
   - `go_src/models/models.go` において、`Userlist` は `csv:"-"` と定義されている。
   - CSV エクスポートされるのは `id, hostname, ip, platform, os, port, tags, description, updatedAt` のみ。
-  - `POST /api/hostlist/import` でもホスト情報のみが `data/hostlist.toml` に反映され、`data/host_credentials.toml` は更新されない。
+  - `POST /api/hostlist/import` でもホスト情報のみが `config/hostlist.toml` に反映され、`config/host_credentials.toml` は更新されない。
 - **対応結果・反映先**:
   - ✅ **対応完了**
   - **反映先**:
@@ -163,7 +163,7 @@
     - [docs/backup_and_recovery.md](backup_and_recovery.md)「3. CSV インポート/エクスポートの仕様と注意点」
   - **対応内容**:
     - CSV にはクレデンシャル情報が一切出力・インポートされない仕様を警告（`[!WARNING]`）として大きく明記。
-    - パスワードを含む全データ移行・バックアップには `data/host_credentials.toml` のファイル単位コピーが必要であることを説明。
+    - パスワードを含む全データ移行・バックアップには `config/host_credentials.toml` のファイル単位コピーが必要であることを説明。
 
 ---
 
@@ -191,7 +191,7 @@
   - **反映先**:
     - [docs/backup_and_recovery.md](backup_and_recovery.md)「1. バックアップ対象ファイル一覧」および「4. ディザスタリカバリ（新サーバーへの移行・復元手順）」
   - **対応内容**:
-    - バックアップ対象として `data/`（設定・データ）および `cert/`（TLS証明書・CA秘密鍵・CRL）の2大ディレクトリを特定。
+    - バックアップ対象として `config/`（設定・データ）および `cert/`（TLS証明書・CA秘密鍵・CRL）の2大ディレクトリを特定。
     - `tar czvf` によるワンライナーバックアップコマンド、新サーバーへの復元展開コマンド、パーミッション再設定（`chmod 600/700`）、動作確認までの手順を完全体系化。
 
 ---

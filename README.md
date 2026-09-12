@@ -7,7 +7,7 @@ hostname, IPアドレス, プラットフォーム, OS, アクセスプロトコ
 ## 🚀 クイックスタート & 開発・ビルド方法
 
 ### 0. 初期アカウント & ログイン情報
-初回起動時、`data/config.toml` に以下の初期認証情報が設定されます：
+初回起動時、`config/config.toml` に以下の初期認証情報が設定されます：
 
 | アカウント種別 | ユーザー名 | 初期パスワード | 権限・役割 |
 | :--- | :--- | :--- | :--- |
@@ -17,7 +17,7 @@ hostname, IPアドレス, プラットフォーム, OS, アクセスプロトコ
 
 > [!CAUTION]
 > **初期設定の変更（必須）**:
-> 初回起動後は直ちに `data/config.toml` を開き、各パスワードの変更および必要に応じた接続元 IP の追加（`permit_ip_list`）を行ってサーバーを再起動してください。詳細は [docs/security_and_roles.md](docs/security_and_roles.md) をご参照ください。
+> 初回起動後は直ちに `config/config.toml` を開き、各パスワードの変更および必要に応じた接続元 IP の追加（`permit_ip_list`）を行ってサーバーを再起動してください。詳細は [docs/security_and_roles.md](docs/security_and_roles.md) をご参照ください。
 
 ---
 
@@ -172,7 +172,7 @@ Web UI のトップバー右上にある「hcm-client.tgz」ボタンをクリ�
 - セキュアなHTTP-only Cookieによるセッション管理とログアウト機能。
 
 ### 8. IPアドレス制限 & 専用CLIクライアント (`./hcm-client` / goplur連携)
-- `data/config.toml` に指定した許可IPリスト（`permit_ip_list`）に基づくクライアントアクセス制限機能を実装。
+- `config/config.toml` に指定した許可IPリスト（`permit_ip_list`）に基づくクライアントアクセス制限機能を実装。
 - **SSH/Telnet対象ホスト自動リスト取得 (`GET /api/ssh-fzf`)**:
   - `Accesslist` に `ssh` または `telnet`（ポート番号問わず）が設定されているホストを自動抽出。
   - ホストと登録ユーザーの組み合わせ（ホスト名, IP, ポート, ユーザー名, プロトコル, プラットフォーム, OS）を一覧で返却。
@@ -184,9 +184,9 @@ Web UI のトップバー右上にある「hcm-client.tgz」ボタンをクリ�
 
 ### 9. TOMLデータストア & CSVインポート/エクスポート
 - **TOMLによる分離保存**:
-  - `data/hostlist.toml`: ホストメタデータ（ホスト名、IP、プラットフォーム、OS、タグ、説明、AccessList）。
-  - `data/host_credentials.toml`: 各ホストに紐付くユーザー名・パスワード情報。
-  - `data/config.toml`: 許可IPアドレスおよび各種認証パスワード設定。
+  - `config/hostlist.toml`: ホストメタデータ（ホスト名、IP、プラットフォーム、OS、タグ、説明、AccessList）。
+  - `config/host_credentials.toml`: 各ホストに紐付くユーザー名・パスワード情報。
+  - `config/config.toml`: 許可IPアドレスおよび各種認証パスワード設定。
 - **CSVインポート**:
   - ドラッグ＆ドロップまたはファイル選択に対応。
   - 既存データに追記する「マージ (Merge)」と、全データを置き換える「上書き (Overwrite)」の2モードを選択可能。
@@ -228,7 +228,7 @@ Web UI のトップバー右上にある「hcm-client.tgz」ボタンをクリ�
 │   ├── cert.pem              # サーバーSSL証明書
 │   ├── key.pem               # サーバー秘密鍵
 │   └── create_certs.sh       # 証明書自己署名生成スクリプト
-├── data/                     # TOMLデータストア
+├── config/                     # TOMLデータストア
 │   ├── config.toml           # 許可IPリストおよびシステムパスワード設定
 │   ├── hostlist.toml         # ホスト一覧およびアクセスリスト情報
 │   └── host_credentials.toml# 各ホストのユーザー認証情報
@@ -267,7 +267,7 @@ Web UI のトップバー右上にある「hcm-client.tgz」ボタンをクリ�
 
 ---
 
-## ⚙️ 設定ファイル (`data/config.toml`)
+## ⚙️ 設定ファイル (`config/config.toml`)
 
 初回起動時に `./config/config.toml` が自動生成されます。必要に応じて許可IPやパスワードを変更してください：
 

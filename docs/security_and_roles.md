@@ -7,7 +7,7 @@
 ## 1. 初期アカウントと初回セットアップ
 
 ### 1.1 初期認証情報一覧
-HCM は初回起動時、`data/config.toml` が存在しない場合に以下のデフォルト設定でファイルを自動生成します：
+HCM は初回起動時、`config/config.toml` が存在しない場合に以下のデフォルト設定でファイルを自動生成します：
 
 | アカウント / 項目 | 初期値 | 役割・用途 |
 | :--- | :--- | :--- |
@@ -18,11 +18,11 @@ HCM は初回起動時、`data/config.toml` が存在しない場合に以下の
 
 > [!CAUTION]
 > **本番運用前の必須設定**:
-> 初期値（`admin` / `user` / `password`）のまま運用すると、同一ネットワークから不正アクセスを受ける重大なセキュリティリスクとなります。**初回起動後、直ちに `data/config.toml` を編集して強力なパスワードに変更し、サーバーを再起動してください。**
+> 初期値（`admin` / `user` / `password`）のまま運用すると、同一ネットワークから不正アクセスを受ける重大なセキュリティリスクとなります。**初回起動後、直ちに `config/config.toml` を編集して強力なパスワードに変更し、サーバーを再起動してください。**
 
 ### 1.2 パスワード変更手順
 1. サーバープロセスを停止します（または編集後に再起動します）。
-2. `data/config.toml` をエディタで開きます：
+2. `config/config.toml` をエディタで開きます：
    ```toml
    permit_ip_list = ['127.0.0.1', '192.168.1.50']
    masterpassword = 'YourStrongMasterPasswordHere!'
@@ -68,8 +68,8 @@ HCM は初回起動時、`data/config.toml` が存在しない場合に以下の
 
 ### 3.1 データの保存形態（平文 TOML）
 本システムでは、高速なファイルベース運用を実現するため、以下のファイルに認証情報を平文（Plaintext）で保存しています：
-- `data/config.toml`: システムパスワード、マスターパスワード
-- `data/host_credentials.toml`: 各ターゲットホストのログインユーザー名、パスワード
+- `config/config.toml`: システムパスワード、マスターパスワード
+- `config/host_credentials.toml`: 各ターゲットホストのログインユーザー名、パスワード
 
 `hcm-client` や `POST /api/ssh-fzf` が要求する「マスターパスワード」は、暗号化ブロックの復号鍵ではなく、**「サーバーに保管されている平文パスワードを取り出すための照合用ゲートウェイパスワード（共有シークレット）」** として動作します。
 
@@ -81,7 +81,7 @@ HCM は初回起動時、`data/config.toml` が存在しない場合に以下の
 chmod 700 data
 
 # 設定ファイルおよび認証情報ファイルのアクセス権を厳格化
-chmod 600 data/*.toml
+chmod 600 config/*.toml
 
 # 証明書の秘密鍵も同様に所有者のみに制限
 chmod 600 cert/*key.pem
@@ -101,7 +101,7 @@ chmod 600 cert/*key.pem
 `go_src/server/routes.go` の `IPRestrictionMiddleware` は、すべての HTTP / HTTPS リクエストに対してアクセス元 IP アドレスの検証を行います。
 
 ```toml
-# data/config.toml
+# config/config.toml
 permit_ip_list = [
   '127.0.0.1',
   '192.168.10.15',

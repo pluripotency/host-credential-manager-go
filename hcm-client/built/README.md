@@ -112,4 +112,4 @@ SERVER_IP=192.168.1.100 SERVER_PORT=8443 ./run.sh
 | `remote error: tls: unknown certificate authority` | サーバー側で CA が更新された | Web UI にログインし、最新の `hcm-client.tgz` を再ダウンロードしてください。 |
 | `status 401: Client certificate required` | クライアント証明書なしで接続した | 正規の `run.sh` または `hcm-client` バイナリを使用してください。 |
 | `status 401: Invalid masterpassword` | マスターパスワードが違う | サーバー側管理者にマスターパスワードを確認してください。 |
-| `status 403: Forbidden` | 接続元 IP が許可されていない | サーバー側の `data/config.toml` の `permit_ip_list` に自端末の IP を追加してもらってください。 |
+| `status 403: Forbidden` | 接続元 IP が許可されていない | サーバー側の `config/config.toml` の `permit_ip_list` に自端末の IP を追加してもらってください。 |

@@ -12,8 +12,8 @@
 | **`remote error: tls: unknown certificate authority`** | `hcm-client` | サーバー側で CA が更新され、古い Root CA で署名された旧クライアント証明書が拒否された | Web UI にログインし、新しい CA/証明書が埋め込まれた最新の `hcm-client.tgz` を再ダウンロードする。 |
 | **`x509: certificate signed by unknown authority`** | `hcm-client` | クライアントが保持する CA 証明書と、接続先サーバーが提示した証明書の CA が一致しない | 1. 接続先 `--url` が正しいか確認する。<br>2. サーバー証明書が更新されている場合は最新の `hcm-client.tgz` を再ダウンロードする。 |
 | **`status 401: {"error":"Client certificate required (mTLS)"}`** | `hcm-client` / curl | mTLS 必須エンドポイント（`/api/ssh-fzf` 等）にクライアント証明書なしでアクセスした | 1. プレーンな HTTP ではなく HTTPS でアクセスしているか確認。<br>2. curl の場合は `--cert` と `--key` を指定する。<br>3. `hcm-client` の場合は証明書が埋め込まれた正規バイナリを使用する。 |
-| **`status 401: Invalid masterpassword`** | `hcm-client` | 入力したマスターパスワードが、サーバー側 `data/config.toml` の `masterpassword` と一致しない | 正しいマスターパスワードを入力する。忘れた場合はサーバー管理者に `data/config.toml` の値を確認してもらう。 |
-| **`status 403: Forbidden`** | ブラウザ / `hcm-client` | クライアントの IP アドレスがサーバーの `permit_ip_list` に含まれていない | サーバー管理者側で `data/config.toml` の `permit_ip_list` 配列に接続元のクライアント IP アドレスを追加し、サーバーを再起動する。 |
+| **`status 401: Invalid masterpassword`** | `hcm-client` | 入力したマスターパスワードが、サーバー側 `config/config.toml` の `masterpassword` と一致しない | 正しいマスターパスワードを入力する。忘れた場合はサーバー管理者に `config/config.toml` の値を確認してもらう。 |
+| **`status 403: Forbidden`** | ブラウザ / `hcm-client` | クライアントの IP アドレスがサーバーの `permit_ip_list` に含まれていない | サーバー管理者側で `config/config.toml` の `permit_ip_list` 配列に接続元のクライアント IP アドレスを追加し、サーバーを再起動する。 |
 | **`connection refused` / 接続タイムアウト** | ブラウザ / `hcm-client` | HCM サーバープロセスが停止している、ポート番号が異なる、またはファイアウォールで遮断されている | 1. サーバー上でプロセスが起動しているか確認（`ss -tulpn \| grep 8080`）。<br>2. ポート番号（デフォルト: 8080）および OS のファイアウォール（firewalld, ufw 等）の開放状況を確認する。 |
 | **`TLS handshake error ... remote error: tls: unknown certificate`** | サーバー側ログ | ブラウザやツールが自己署名 CA（`MyLocalSSHCA`）を信頼していないため、クライアント側が TLS を中断した | 実害はありません。詳細は [docs/about_cert_err.md](about_cert_err.md) を参照し、ブラウザで証明書の例外許可を行うか、CA を OS 信頼ストアにインポートしてください。 |
 

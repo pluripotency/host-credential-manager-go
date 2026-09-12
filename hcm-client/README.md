@@ -173,7 +173,7 @@ Telnet 接続時に対象機器からログアウトせずに強制切断した�
 | `remote error: tls: bad certificate` | クライアント証明書が CRL で失効されている | Web UI にログインして新しい `hcm-client.tgz` を再ダウンロードしてください。 |
 | `remote error: tls: unknown certificate authority` | サーバー側で CA が更新された | Web UI にログインして最新の `hcm-client.tgz` を再ダウンロードしてください。 |
 | `status 401: Client certificate required (mTLS)` | クライアント証明書なしで接続した | 正規の `hcm-client` を使用しているか、または HTTPS で接続しているか確認してください。 |
-| `status 401: Invalid masterpassword` | マスターパスワード不一致 | サーバー側 `data/config.toml` の `masterpassword` を確認してください。 |
-| `status 403: Forbidden` | 接続元 IP が許可されていない | サーバー側の `data/config.toml` の `permit_ip_list` に自端末の IP を追加してください。 |
+| `status 401: Invalid masterpassword` | マスターパスワード不一致 | サーバー側 `config/config.toml` の `masterpassword` を確認してください。 |
+| `status 403: Forbidden` | 接続元 IP が許可されていない | サーバー側の `config/config.toml` の `permit_ip_list` に自端末の IP を追加してください。 |
 
 より詳細なエラー対応は [docs/troubleshooting.md](../docs/troubleshooting.md) をご参照ください。

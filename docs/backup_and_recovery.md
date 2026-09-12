@@ -10,7 +10,7 @@ HCM はステートレスなバイナリと、ローカルファイル（TOML �
 
 ```text
 host-credential-manager-go/
-├── data/                             # 【必須】データベース・設定ディレクトリ
+├── config/                             # 【必須】データベース・設定ディレクトリ
 │   ├── config.toml                   # 許可IP、システムパスワード、マスターパスワード
 │   ├── hostlist.toml                 # ホスト一覧、IP、ポート、OS、タグ、アクセスリスト
 │   └── host_credentials.toml        # 各ホストのログインユーザー名、パスワード
@@ -22,7 +22,7 @@ host-credential-manager-go/
 ```
 
 > [!CAUTION]
-> `data/` だけでなく `cert/` も必ず一緒にバックアップしてください。
+> `config/` だけでなく `cert/` も必ず一緒にバックアップしてください。
 > `cert/` を失うと Root CA の秘密鍵が失われ、既存の `hcm-client` との mTLS 通信や CRL による失効管理が継続できなくなります。
 
 ---
@@ -36,7 +36,7 @@ host-credential-manager-go/
 ```bash
 # プロジェクトルートで実行
 BACKUP_NAME="hcm-backup-$(date +%Y%m%d_%H%M%S).tar.gz"
-tar -czvf "${BACKUP_NAME}" data/ cert/
+tar -czvf "${BACKUP_NAME}" config/ cert/
 
 # バックアップファイルの安全なパーミッション設定
 chmod 600 "${BACKUP_NAME}"
@@ -55,8 +55,8 @@ chmod 600 "${BACKUP_NAME}"
    ```
 3. パーミッションを厳格化します：
    ```bash
-   chmod 700 data cert
-   chmod 600 data/*.toml cert/*.pem
+   chmod 700 config cert
+   chmod 600 config/*.toml cert/*.pem
    ```
 4. サーバーを起動します：
    ```bash
@@ -74,7 +74,7 @@ Web UI の管理者メニューには「CSVエクスポート」「CSVインポ�
 > [!WARNING]
 > **CSV をバックアップとして使用しないでください**:
 > セキュリティおよびフォーマットの観点から、**CSV エクスポート機能はホストのメタデータ（ホスト名、IP、OS、タグ等）のみを出力します。ユーザー名およびパスワード（`userlist`）は CSV に出力されず、CSV インポートでも復元されません**。
-> パスワードも含めた完全なバックアップを行うには、必ず前述の `data/host_credentials.toml` を退避してください。
+> パスワードも含めた完全なバックアップを行うには、必ず前述の `config/host_credentials.toml` を退避してください。
 
 ### 3.2 CSV のフォーマット仕様
 CSV のヘッダー行および各列の定義は以下の通りです：
@@ -97,8 +97,8 @@ sw01,core-switch-01,192.168.1.1,Cisco,IOS-XE,23,"network,core","Core switch",202
 ## 4. `hostlist.toml` と `host_credentials.toml` の結合仕様
 
 HCM は内部でホスト情報と認証情報を 2 つの独立したファイルで管理しています：
-- `data/hostlist.toml`: ホストの基本情報（IP、プラットフォーム、OS、タグ、アクセスリスト）
-- `data/host_credentials.toml`: ホストに紐付くログインユーザー一覧と各パスワード
+- `config/hostlist.toml`: ホストの基本情報（IP、プラットフォーム、OS、タグ、アクセスリスト）
+- `config/host_credentials.toml`: ホストに紐付くログインユーザー一覧と各パスワード
 
 ### 4.1 結合キー（`hostname`）
 - 両ファイルは **`hostname`（ホスト名文字列）を完全一致キー** としてメモリ上で結合されます。
